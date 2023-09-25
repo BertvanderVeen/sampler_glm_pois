@@ -1,0 +1,472 @@
+---
+format: 
+  html:
+    page-layout: full
+---
+
+# Adopting a JAGS sampler
+NIMBLE [de Valpine et al. 2017](https://www.tandfonline.com/doi/full/10.1080/10618600.2016.1172487) is a relatively new framework for fitting hierarchical models with MCMC. Previously, latent variable models were often fitted with JAGS [Plummer 2004](https://pdfs.semanticscholar.org/837b/9203abc8b3416e620d4c99d8500b4bd9be20.pdf) instead. An example for latent variable models, is the R-package Boral [Hui 2016](https://besjournals.onlinelibrary.wiley.com/doi/abs/10.1111/2041-210X.12514). 
+
+Boral allows users to straightforwardly, in familiar R interface, specify a latent variable model. This model specification is then translated to BUGS code (which JAGS uses) using some text manipulation. A while ago I decided that NIMBLE can probably sample the parameters for such a model more efficiently, as it allows for more flexibility in sampler specification and blocking schemes for parameters. Off I went; translating the script outputted by Boral in a format that can be read by NIMBLE was straightforward. Unfortunately, relative to NIMBLE's automated factor slice sampler, JAGS provided much more effective samples than NIMBLE.
+
+One of the reasons for this, I suspect, if that JAGS has a larger library of MCMC samplers. Especially when it comes to models that can be represented as a GLM. This is also the case for latent variable models, because those are (almost) GLMs when keeping the latent variable fixed, and while estimating the other parameters. As a fairer comparison, I have set off to code up some GLM samplers from JAGS in NIMBLE. This is quite a challenge, since JAGS's samplers are coded in C++, and, well, my C++ is rusty at best. Fortunately, the [pogit R-package](https://cran.r-project.org/web/packages/pogit/index.html) includes chunks of the samplers in R-code, so I can use that when my understanding of C++ fails (and to verify that everything works correctly). It also does slab-and-spike variable selection, but I can ignore that bit for now.
+
+## The Sampler
+
+JAGS has not one GLM sampler. It might seem like that at first glance because JAGS's "GLM factory" has multiple scripts (such as [this one](https://github.com/todesking/JAGS-code/blob/master/src/modules/glm/samplers/GLMMethod.cc)) specific to GLMs. However, the idea is that when fed a model (script), JAGS first checks if that model can be represented as a linear model. If it can, it checks the distribution for the responses and is fed to a corresponding sampler for that distribution. Consequently, the "GLM sampler" is in fact a multitude of samplers. Each sampler is based on the same idea; the GLM can be represented as a linear model with some smart statistical voodoo.
+
+For the Poisson case this is based on the work by [Fruhwirth-Schnatter and Wagner 2004](https://research.wu.ac.at/en/publications/data-augmentation-and-gibbs-sampling-for-regression-models-of-sma-7) and [Fruhwirth-Schnatter et al. 2009](https://link.springer.com/article/10.1007/s11222-008-9109-4).
+
+The sampler relies on representing Poisson random variables in terms of their inter-arrival times, and approximating the distribution of the inter-arrival times by mixtures of normal distributions. Conditional on some quantities, the Poisson regression can be (approximately) represented as a linear regression. On each iteration of the sampler, the parameters are (conditionally) sampled from a multivariate normal distribution. Consequently, we can think of the sampler (algorithm) in three steps: 1) update parameters conditional on the inter-arrival times $\boldsymbol{\tau}_i$ and indicator variables $\boldsymbol{R}_1$ and $\boldsymbol{R}_2$. These latter quantities are treated as missing data.
+
+The *pogit* R-package has functions to update these quantities; [**iams1_poisson**](https://github.com/cran/pogit/blob/b0f4b72eaabb1ce32efa1f4ce5517be7ece2afd0/R/dataug_pois_iams.R#L69) updates $\boldsymbol{\tau}$, [**iams2_poisson**](https://github.com/cran/pogit/blob/b0f4b72eaabb1ce32efa1f4ce5517be7ece2afd0/R/dataug_pois_iams.R#L97) updates $\boldsymbol{R}_1$ and $\boldsymbol{R}_2$ (and returns them in a concatenated vector). The posterior mean and covariance are calculated as a function of those quantities in [**select_poisson**](https://github.com/cran/pogit/blob/b0f4b72eaabb1ce32efa1f4ce5517be7ece2afd0/R/select_poisson.R#L110), where also a sampler from the posterior is drawn. The two additional functions [**mixcomp_poisson**](https://github.com/cran/pogit/blob/master/R/mixcomp_poisson.R) and [**compute_mixture**](https://github.com/cran/pogit/blob/b0f4b72eaabb1ce32efa1f4ce5517be7ece2afd0/R/compute_mixture.R) take care of the finite mixture approximation. **mixcomp_poisson** holds the necessary parameters for the finite mixture representation in the Poisson case, and **compute_mixture** uses those to calculate the approximation. The **mixcomp_poisson** function is (essentially) just a list, so I will ignore that for now and just call it from the package when I need it.
+
+All these functions are present in JAGS as well, in: [AuxMixPoisson.CC](https://github.com/todesking/JAGS-code/blob/master/src/modules/glm/samplers/AuxMixPoisson.cc) and [AuxMixPoisson.h](https://github.com/todesking/JAGS-code/blob/master/src/modules/glm/samplers/AuxMixPoisson.h), and [LGMix.CC](https://github.com/todesking/JAGS-code/blob/master/src/modules/glm/samplers/LGMix.cc).
+
+### Updating the inter-arrival times $\boldsymbol{\tau}$
+
+Code from the **pogit** package includes R-functions that are challenging to incorporate in NIMBLE, so I built my functions from the ground up based on their code.
+
+Here is a functiont to update $\boldsymbol{\tau}$:
+
+```{r tau_func}
+library(nimble)
+update_tau = function(response.nodes = integer(1), n.response.nodes = integer(), n.zero.response.nodes = integer(), lambda = double(1)){
+                        taunew = matrix(0, nrow = n.response.nodes, ncol = 2)
+                        taunew[,1] <- rexp(n.response.nodes, lambda)
+                        tau2 <- rbeta(n.response.nodes - n.zero.response.nodes, response.nodes[response.nodes>0], 1)
+                        taunew[response.nodes > 0,  1] = 1-tau2 + taunew[response.nodes > 0,1]
+                        taunew[response.nodes > 0,  2]  = tau2
+                        taunew[response.nodes == 0, 1] = 1 +  taunew[response.nodes == 0, 1]
+                        return(taunew)
+                      }
+```
+
+I can simulate some data following a simple example:
+```{r sim_dat}
+N <- 1000 # number of observations
+beta0 <- 1  # intercept
+beta1 <- 1  # slope
+set.seed(1);x <- rnorm(n=N)  # standard normal predictor
+eta <- beta0*1 + beta1*x  # linear predictor function
+lambda <- exp(eta)  # link function
+set.seed(1);y <- rpois(n=N, lambda=lambda)  # Poisson DV
+```
+
+and verify that it returns the same result as **pogit**:
+```{r check_tau}
+# calculate tau
+set.seed(1);my_tau <- update_tau(response.nodes = y, n.response.nodes = N, n.zero.response.nodes = sum(y==0), lambda = lambda) # returns a matrix
+# pogit needs these objects already here, they include properties of the data
+mcomp <- pogit:::mixcomp_poisson()
+compmix.pois <- pogit:::get_mixcomp(y = y, mcomp = mcomp)
+set.seed(1);pogit_tau <- pogit:::iams1_poisson(y = y, mu = lambda, compmix.pois = compmix.pois) # returns a list of t1, t2
+
+# calculate differences between vectors to verify correctness
+sum(my_tau[,1] - pogit_tau$t1) # should be zero
+sum(my_tau[y>0,2] - pogit_tau$t2) # should be zero
+```
+
+### Updating the indicator variables $\boldsymbol{R}_1$ and $\boldsymbol{R}_2$
+
+So, tau is correct. Let us continue with a function for the indicator variables. The **pogit** package returns the two variables from the **iams2_poisson** function in a concatenated string, I have written two separate functions:
+
+```{r R1_func}
+update_R1 = function(n.response.nodes = integer(), lp = double(1), t1 = double(1), mcompm = double(2), mcompv = double(2), c1 = double(2))
+                      {
+                        minlogt1minlp <- matrix(-log(t1) - lp,ncol=10,nrow=n.response.nodes)
+                        repmcompm  <- t(matrix(mcompm[1,], ncol = n.response.nodes, nrow = 10))
+                        repmcompv <- t(matrix(mcompv[1,], ncol = n.response.nodes, nrow = 10))
+                        rgm   <- c1 - 0.5*(minlogt1minlp - repmcompm)^2/repmcompv
+                        for(i in 1:10){ #ncol rgm
+                          rgm[rgm[,i]==0,i] <- -Inf
+                        }
+                        mx <- numeric(n.response.nodes)
+                        e1 <- matrix(0, ncol = 10, nrow = n.response.nodes)
+                        for(i in 1:n.response.nodes){
+                          mx[i] <- max(rgm[i,])
+                          if(mx[i]==-Inf)mx[i]=0
+                          e1[i,] <- exp(rgm[i,]-mx[i])
+                        }
+                        rgmod <- numeric(n.response.nodes)
+                        for(i in 1:n.response.nodes){
+                          rgmod[i] <- sum(e1[i,])
+                        }
+                        e1.new = matrix(0, ncol = 10, nrow = n.response.nodes)
+                        for(i in 1:10){
+                          e1.new[,i] <- e1[,i]/rgmod # for safety might want to check for 0/0 i.e., nan
+                        }
+                        tri.mat = matrix(1, 10, 10)
+                        for (j in 1:9) {
+                          for (i in (j+1):10) {
+                            tri.mat[i,j] = 0
+                          }
+                        }
+                        Fn    <- e1.new%*%tri.mat
+                        
+                        # determination of random indicators R1
+                        u <- runif(n.response.nodes, 0, 1)
+                        R1.temp <- matrix(0, ncol = 10, nrow = n.response.nodes)
+                        for(i in 1:10){
+                          R1.temp[,i] <- u<Fn[,i] #can probably replace this step by "sample()"?
+                        }
+                       R1 <- numeric(n.response.nodes)
+                        for(i in 1:n.response.nodes){
+                          R1[i] <- 11-sum(R1.temp[i,])
+                        }
+                       return(R1)
+                      }
+```
+```{r R2_func}
+update_R2 = function(response.nodes = integer(1), n.response.nodes = integer(), n.zero.response.nodes = integer(), lp = double(1), t2 = double(1), vy = double(2), my = double(2), vy2 = double(2), c2 = double(2)){
+                        
+                        minlogt2minlp <- matrix(-log(t2) - lp[response.nodes>0],ncol=10,nrow=n.response.nodes-n.zero.response.nodes)
+                        
+                        kill <- matrix(vy > 0, n.response.nodes - n.zero.response.nodes, 10)
+                        xx     <- minlogt2minlp*kill
+                        rgmx   <- c2 - 0.5*(xx - my)^2/vy2
+                        for(i in 1:10){ #ncol r gm
+                          rgmx[rgmx[,i]==0,i] <- -Inf
+                        }
+                        e2 <- matrix(0,nrow = n.response.nodes-n.zero.response.nodes, ncol = 10)
+                        mx2 = numeric(n.response.nodes-n.zero.response.nodes)
+                        for(i in 1:(n.response.nodes-n.zero.response.nodes)){
+                          mx2[i] = max(rgmx[i,])
+                          if(mx2[i]==-Inf)mx2[i]=0
+                          e2[i,] <- exp(rgmx[i,]-mx2[i])
+                        }
+                        rgmodx <- numeric(n.response.nodes-n.zero.response.nodes)
+                        for(i in 1:(n.response.nodes-n.zero.response.nodes)){
+                          rgmodx[i] <- sum(e2[i,])
+                        }
+                        e2.new = matrix(0,nrow=n.response.nodes-n.zero.response.nodes, ncol = 10)
+                        for(i in 1:10){
+                          e2.new[,i] <- e2[,i]/rgmodx # for safety might want to check for 0/0 i.e., nan
+                        }
+                        
+                        tri.mat = matrix(1, 10, 10)
+                        for (j in 1:9) {
+                          for (i in (j+1):10) {
+                            tri.mat[i,j] = 0
+                          }
+                        }
+                        
+                        Fx     <- e2.new%*%tri.mat
+                        
+                        # determination of random indicators R2
+                        ux <- runif(n.response.nodes - n.zero.response.nodes, 0, 1)
+                        R2.temp <- matrix(0, ncol = 10, nrow = n.response.nodes - n.zero.response.nodes)
+                        for(i in 1:10){
+                          R2.temp[,i] <- ux<Fx[,i]
+                        }
+                        
+                        R2 <- numeric(n.response.nodes-n.zero.response.nodes)
+                        for(i in 1:(n.response.nodes-n.zero.response.nodes)){
+                          R2[i] <- 11-sum(R2.temp[i,])
+                        }
+                        return(R2)
+                      }
+```
+
+Comparing again to the **pogit** package:
+
+```{r check_R}
+# first I compute a constant that both functions need
+c1 <- t(matrix(log(mcomp$w[1, ]) - 0.5*log(mcomp$v[1, ]), nrow = 10, ncol = N))
+# calculate my Rs
+# extra input for my R2
+lwy <- log(compmix.pois$wy)
+lwy[compmix.pois$wy==0] <- 0
+lvy <- log(compmix.pois$vy)
+lvy[compmix.pois$vy==0] <- 0
+vy2 <- compmix.pois$vy
+vy2[vy2==0] <- 1
+c2 <- (lwy - 0.5*lvy) 
+    
+set.seed(1);my_R1 <- update_R1(n.response.nodes = N, lp = eta, t1 = pogit_tau$t1, mcompm = mcomp$m, mcompv = mcomp$v, c1 = c1)
+set.seed(1);my_R2 <- update_R2(response.nodes = y, n.response.nodes = N, n.zero.response.nodes = sum(y==0), lp = eta, t2 = pogit_tau$t2, vy = compmix.pois$vy, my = compmix.pois$my, vy2 = vy2, c2 =  c2)
+# pogit Rs
+cm1 <- list(comp = list(m = mcomp$m[1, ], v = mcomp$v[1, ], w = mcomp$w[1, ]), c1 = c1) # pogit requires a list of arguments
+set.seed(1);pogit_R <- pogit:::iams2_poisson(n = N, tau1 = pogit_tau$t1, tau2 = pogit_tau$t2, logMu = eta, logMugz = eta[y>0], cm1 = cm1, compmix = compmix.pois)
+
+sum(pogit_R[1:N]-my_R1) # should be zero
+sum(pogit_R[-c(1:N)]-my_R2) # should be zero but something is weird with the seed; i have doubly verified that this output is correct
+```
+
+### Posterior moments
+
+All that remains is to calculate the posterior moments and generate a sample from the posterior. Unfortunately, this is harder to reproduce with the **pogit** package because there is no function that returns those quantiites.
+
+### Putting it all together in NIMBLE
+
+Finally, we put everything together in a NIMBLE sampler;
+
+```{r nim_samp}
+# sampler for Poisson responses based on Fruhwirth-Schnatter and Wagner 2006 and Fruhwirth-Schnatter et al. 2009
+# as implemented in the JAGS and the pogit packages
+sampler_glm_pois <- nimbleFunction(
+  
+  contains = sampler_BASE,
+  name = 'sampler_glm_pois',
+  setup = function(model, mvSaved, target, control) {
+    # get response data nodes
+    response.nodes.names <- names(which(model$isStoch(names(model$origData)))) # names of response nodes
+    if(!all(model$getDistribution(response.nodes.names)=="dpois"))stop("This sampler is designed only for Poisson responses.")
+    response.name  = unique(gsub("\\[.*","",response.nodes.names))
+    response.nodes <- values(model, response.nodes.names) # response data
+    n.response.nodes <- length(response.nodes) # number of observations
+    n.zero.response.nodes = sum(response.nodes==0) # number of zero observations
+    ## get distribution parameter names
+    dist.par.names = model$getParents(response.nodes.names,determOnly = F, immediateOnly = T)
+    distpar.name  = unique(gsub("\\[.*","",dist.par.names))
+    lp.nodes.names = model$getParents(dist.par.names,immediateOnly = T, determOnly = T,includeData = F)
+    lp.name  = unique(gsub("\\[.*","",lp.nodes.names))
+    # get corresponding "data" nodes to target, should do this automatically based o "target"
+    X <- model$X
+    # number of target parameters
+    n.param.nodes <- dim(X)[2]
+    # prior parameters, should get these based on "target"
+    bPriorMean = numeric(n.param.nodes) # still replace if different
+    bPriorCov = diag(n.param.nodes) # still replace if different
+    # mixture components
+    # v: variances (s), m: means (m), w: weights
+    mcomp <- if(!is.null(control$mcomp)) control$mcomp else mcomp <- pogit:::mixcomp_poisson()
+    mcompm <- mcomp$m
+    mcompv <- mcomp$v
+    mcompw <- mcomp$w
+    # initialize R, indicator variables
+    R1 <- rep(NA_real_, n.response.nodes)
+    R2 <- rep(NA_real_, n.response.nodes-n.zero.response.nodes)
+    tau <- matrix(NA_real_, n.response.nodes,ncol=2)
+    # start by getting mixture components, this is "get_mixcomp" in pogit
+    # m: means for mixture components, v: scales, w: weights
+    if(sum(response.nodes<3e4)==n.response.nodes){
+      my = mcomp$m[response.nodes[response.nodes>0],]
+      vy = mcomp$v[response.nodes[response.nodes>0],]
+      wy = mcomp$w[response.nodes[response.nodes>0],]
+    }else{
+      wy = vy = my = matrix(0, nrow = n.response.nodes - n.zero.response.nodes, ncol = 10)
+      my[response.nodes[response.nodes>0] <= 3e4,1:dim(mcomp$m)[2]] = mcomp$m[response.nodes[(response.nodes>0) & (response.nodes <= 3e4)],]
+      vy[response.nodes[response.nodes>0] <= 3e4,1:dim(mcomp$v)[2]] = mcomp$v[response.nodes[(response.nodes>0) & (response.nodes <= 3e4)],]
+      wy[response.nodes[response.nodes>0] <= 3e4,1:dim(mcomp$w)[2]] = mcomp$w[response.nodes[(response.nodes>0) & (response.nodes <= 3e4)],]
+      for(i in response.nodes[response.nodes>3e4]){
+        my[response.nodes[response.nodes>0]==i,1] <- sqrt(trigamma(i))*m - digamma(i)
+        vy[response.nodes[response.nodes>0]==i,1] <- trigamma(i)*v
+        wy[response.nodes[response.nodes>0]==i,1] <- 1 
+      }
+    }
+    vy[is.na(vy)] <- 0
+    my[is.na(my)] <- 0
+    wy[is.na(wy)] <- 0
+    # for use in step 3
+    lwy <- log(wy)
+    lwy[wy==0] <- 0
+    lvy <- log(vy)
+    lvy[vy==0] <- 0
+    c1 <- t(matrix(log(mcompw[1, ]) - 0.5*log(mcompv[1, ]), nrow = 10, ncol = n.response.nodes)) # not sure what this is yet
+    
+    vy2 <- vy
+    vy2[vy2==0] <- 1
+    c2 <- (lwy - 0.5*lvy) 
+    
+    calcNodes <- model$getDependencies(target)
+    targetAsScalar <- model$expandNodeNames(target, returnScalarComponents = TRUE)
+  },
+  
+  run = function() {
+    # 1. simulate parameters given R, tau
+    # this part is covered in "select_poisson.R"
+    if(!any_na(R1)){ # I don't update parameters on the first iteration as to generate sensible "warm" start for R1,R2,t1,t2
+    # first mixture component means
+    m1 <- mcompm[R1,1]
+    m2 <- numeric(n.response.nodes-n.zero.response.nodes)
+    for(i in 1:(n.response.nodes-n.zero.response.nodes)){
+      m2[i] <- my[i,R2[i]]
+    }
+    # second: mixture component variances
+    v1 <- mcompv[R1,1]
+    v2 <- numeric(n.response.nodes-n.zero.response.nodes)
+    for(i in 1:(n.response.nodes-n.zero.response.nodes)){
+      v2[i] <- vy[i,R2[i]]
+    }
+    invSigS = numeric(n.response.nodes)
+    ys1 = (-log(tau[,1])-m1)/v1 # this is also "AuxMixPoisson:value()" in JAGS
+    ys2 = (-log(tau[response.nodes>0,2])-m2)/v2
+    invSigS = 1/v1
+    invSigS[response.nodes>0] = invSigS[response.nodes>0]+1/v2
+    # posterior parameters
+    bPostCov = solve(solve(bPriorCov, diag(n.param.nodes)) + t(X)%*%diag(invSigS)%*%X ,diag(2))
+    bPostMean = bPostCov%*%(solve(bPriorCov,diag(n.param.nodes))%*%bPriorMean+ (t(X)%*%ys1+t(X[response.nodes>0,])%*%ys2)) # see eq (8) Fruhwirth-Schnatter and Wagner 2006 or L109-111 from pogit::select_poisson.Rs
+    # a sample from the posterior
+    proposal <- rmnorm_chol(1, mean = c(bPostMean), cholesky = chol(bPostCov), prec_param = 0)
+    values(model, targetAsScalar) <<-  proposal
+    # update lp, lambda after calculating proposal
+    model$calculate(calcNodes)
+    }
+    ## get LP and mu
+    lp = values(model, lp.nodes.names)
+    lambda = values(model, dist.par.names)
+    #2. update tau's, step 1 in Fruhwirth-Schnatter et al. 2009
+    # this part is covered in dataug_pois_iams.R->iams1_poisson
+    # tau are latent variables that represent the inter-arrival times of a Poisson process
+    # get_mixcomp_poisson in dataug_pois_iams.R just gets components that we need for the other functions
+    
+    update_tau(response.nodes, n.response.nodes, n.zero.response.nodes, lambda)
+    t1 <- tau[,1]
+    t2 <- tau[response.nodes>0,2]
+    # 3. update R's, step 2 in Fruhwirth-Schnatter et al. 2009
+    # this part is covered in dataug_pois_iams.R->iams2_poisson
+    # Rmix are normal mixture approximations to Poissons
+    
+    update_R1(n.response.nodes, lp, t1, mcompm, mcompv, c1)
+    update_R2(response.nodes, n.response.nodes, n.zero.response.nodes, lp, t2, vy, my, vy2, c2)
+    # keep the model and mvSaved objects consistent
+    copy(from = model, to = mvSaved, row = 1, 
+         nodes = target, logProb = TRUE)
+  },
+  
+  methods = list(update_tau = function(response.nodes = integer(1), n.response.nodes = integer(), n.zero.response.nodes = integer(), lambda = double(1)){
+                        taunew = matrix(0, nrow = n.response.nodes, ncol = 2)
+                        taunew[,1] <- rexp(n.response.nodes, lambda)
+                        tau2 <- rbeta(n.response.nodes - n.zero.response.nodes, response.nodes[response.nodes>0], 1)
+                        taunew[response.nodes > 0,  1] = 1-tau2 + taunew[response.nodes > 0,1]
+                        taunew[response.nodes > 0,  2]  = tau2
+                        taunew[response.nodes == 0, 1] = 1 +  taunew[response.nodes == 0, 1]
+                        tau<<-taunew
+                      },
+                    update_R1 = function(n.response.nodes = integer(), lp = double(1), t1 = double(1), mcompm = double(2), mcompv = double(2), c1 = double(2))
+                      {
+                        minlogt1minlp <- matrix(-log(t1) - lp,ncol=10,nrow=n.response.nodes)
+                        repmcompm  <- t(matrix(mcompm[1,], ncol = n.response.nodes, nrow = 10))
+                        repmcompv <- t(matrix(mcompv[1,], ncol = n.response.nodes, nrow = 10))
+                        rgm   <- c1 - 0.5*(minlogt1minlp - repmcompm)^2/repmcompv
+                        for(i in 1:10){ #ncol rgm
+                          rgm[rgm[,i]==0,i] <- -Inf
+                        }
+                        mx <- numeric(n.response.nodes)
+                        e1 <- matrix(0, ncol = 10, nrow = n.response.nodes)
+                        for(i in 1:n.response.nodes){
+                          mx[i] <- max(rgm[i,])
+                          if(mx[i]==-Inf)mx[i]=0
+                          e1[i,] <- exp(rgm[i,]-mx[i])
+                        }
+                        rgmod <- numeric(n.response.nodes)
+                        for(i in 1:n.response.nodes){
+                          rgmod[i] <- sum(e1[i,])
+                        }
+                        e1.new = matrix(0, ncol = 10, nrow = n.response.nodes)
+                        for(i in 1:10){
+                          e1.new[,i] <- e1[,i]/rgmod # for safety might want to check for 0/0 i.e., nan
+                        }
+                        tri.mat = matrix(1, 10, 10)
+                        for (j in 1:9) {
+                          for (i in (j+1):10) {
+                            tri.mat[i,j] = 0
+                          }
+                        }
+                        Fn    <- e1.new%*%tri.mat
+                        
+                        # determination of random indicators R1
+                        u <- runif(n.response.nodes, 0, 1)
+                        R1.temp <- matrix(0, ncol = 10, nrow = n.response.nodes)
+                        for(i in 1:10){
+                          R1.temp[,i] <- u<Fn[,i] #can probably replace this step by "sample()"?
+                        }
+                        
+                        for(i in 1:n.response.nodes){
+                          R1[i] <<- 11-sum(R1.temp[i,])
+                        }
+                      },
+                    update_R2 = function(response.nodes = integer(1), n.response.nodes = integer(), n.zero.response.nodes = integer(), lp = double(1), t2 = double(1), vy = double(2), my = double(2), vy2 = double(2), 
+                                         c2 = double(2)){
+                        
+                        minlogt2minlp <- matrix(-log(t2) - lp[response.nodes>0],ncol=10,nrow=n.response.nodes-n.zero.response.nodes)
+                        
+                        kill <- matrix(vy > 0, n.response.nodes - n.zero.response.nodes, 10)
+                        xx     <- minlogt2minlp*kill
+                        rgmx   <- c2 - 0.5*(xx - my)^2/vy2
+                        for(i in 1:10){ #ncol r gm
+                          rgmx[rgmx[,i]==0,i] <- -Inf
+                        }
+                        e2 <- matrix(0,nrow = n.response.nodes-n.zero.response.nodes, ncol = 10)
+                        mx2 = numeric(n.response.nodes-n.zero.response.nodes)
+                        for(i in 1:(n.response.nodes-n.zero.response.nodes)){
+                          mx2[i] = max(rgmx[i,])
+                          if(mx2[i]==-Inf)mx2[i]=0
+                          e2[i,] <- exp(rgmx[i,]-mx2[i])
+                        }
+                        rgmodx <- numeric(n.response.nodes-n.zero.response.nodes)
+                        for(i in 1:(n.response.nodes-n.zero.response.nodes)){
+                          rgmodx[i] <- sum(e2[i,])
+                        }
+                        e2.new = matrix(0,nrow=n.response.nodes-n.zero.response.nodes, ncol = 10)
+                        for(i in 1:10){
+                          e2.new[,i] <- e2[,i]/rgmodx # for safety might want to check for 0/0 i.e., nan
+                        }
+                        
+                        tri.mat = matrix(1, 10, 10)
+                        for (j in 1:9) {
+                          for (i in (j+1):10) {
+                            tri.mat[i,j] = 0
+                          }
+                        }
+                        
+                        Fx     <- e2.new%*%tri.mat
+                        
+                        # determination of random indicators R2
+                        ux <- runif(n.response.nodes - n.zero.response.nodes, 0, 1)
+                        R2.temp <- matrix(0, ncol = 10, nrow = n.response.nodes - n.zero.response.nodes)
+                        for(i in 1:10){
+                          R2.temp[,i] <- ux<Fx[,i]
+                        }
+                        
+                        for(i in 1:(n.response.nodes-n.zero.response.nodes)){
+                          R2[i] <<- 11-sum(R2.temp[i,])
+                        }
+                      },
+                 reset = function () {}
+                    )
+)
+```
+
+write some BUGS code for a simple Poisson regression;
+
+```{r nim_script}
+library(nimble)
+pois.glm <- nimbleCode({
+  ## Likelihood
+  for(i in 1:N){
+    y[i] ~ dpois(lambda[i])
+    log(lambda[i]) <- eta[i]
+    eta[i] <- inprod(beta[1:k],X[i,])
+  }     
+  ## Priors 
+  for(i in 1:k){
+    beta[i] ~ dnorm(0,1)
+  }
+})
+```
+
+set-up the model:
+
+```{r setup_model}
+dat <- list(X=cbind(1,x),  # predictors
+                y=y)  # DV
+const <- list(
+                N=N,  # sample size
+                k =ncol(dat$X)) # number of covariates,
+model <- nimbleModel(pois.glm, const, dat, inits = list(beta = c(1,1)))
+mod <- nimble::compileNimble(model)
+```
+
+and add and run it for a few iterations to see that we get something sensible:
+
+```{r run_mcmc}
+nimbleMCMCconf <- configureMCMC(mod, monitors = c("beta[1]","beta[2]"))
+nimbleMCMCconf$removeSampler("beta")
+nimbleMCMCconf$addSampler("beta",type="sampler_glm_pois")
+nimbleMCMCb <- buildMCMC(nimbleMCMCconf)
+nimbleMCMCc <- compileNimble(nimbleMCMCb)
+test_run <- runMCMC(nimbleMCMCc, niter = 500, nburnin = 100, thin = 1, nchains = 1, samplesAsCodaMCMC = TRUE)
+test_run[1,] # only returns NaNs :(
+```
