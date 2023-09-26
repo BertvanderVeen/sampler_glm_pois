@@ -239,7 +239,7 @@ return(list(postMean = aP, postCov = AP, proposal = zetaP))
 and my function, only for testing purposes here:
 
 ```{r my_post_calc}
-my_post_calc <- function(X, n.response.nodes, n.zero.response.nodes, response.nodes, R1, R2, tau, mcompv, mcompm, my, vy){
+calc_post_mom <- function(X = double(2), n.response.nodes = integer(), n.zero.response.nodes = integer(), response.nodes = integer(1), R1 = integer(1), R2 = integer(1), tau = double(2), mcompv = double(2), mcompm = double(2), my = double(2), vy = double(2)){
     X <- as.matrix(X)
     n.param.nodes <- ncol(X)
     m1 <- mcompm[1,R1]
@@ -266,21 +266,98 @@ my_post_calc <- function(X, n.response.nodes, n.zero.response.nodes, response.no
     bPostMean = bPostCov%*%(solve(bPriorCov,diag(n.param.nodes))%*%bPriorMean+ (t(X)%*%diag(1/sqrt(v1))%*%ys1+t(X[response.nodes>0,])%*%diag(1/sqrt(v2))%*%ys2)) # see eq (8) Fruhwirth-Schnatter and Wagner 2006 or L109-111 from pogit::select_poisson.Rs
     # a sample from the posterior
     proposal <- rmnorm_chol(1, mean = c(bPostMean), cholesky = chol(bPostCov), prec_param = 0)
-return(list(postMean = bPostMean, postCov = bPostCov, proposal = proposal))
+    postMean <<- bPostMean
+    postCov <<- bPostCov
 }
 ```
 
 test it:
 ```{r test_post_calc}
-set.seed(1);my_post <- my_post_calc(cbind(1,x), N, sum(y==0), y, pogit_R[1:N], pogit_R[-c(1:N)], my_tau, mcomp$v, mcomp$m, compmix.pois$my, compmix.pois$vy)
+set.seed(1);my_post <- calc_post_mom(cbind(1,x), N, sum(y==0), y, pogit_R[1:N], pogit_R[-c(1:N)], my_tau, mcomp$v, mcomp$m, compmix.pois$my, compmix.pois$vy)
 set.seed(1);pogit_post <- pogit_post_calc(cbind(1,x),compmix,pogit_tau$t1, pogit_tau$t2, pogit_R, cm1)
-sum(my_post$postMean-pogit_post$postMean)
-sum(my_post$postCov-pogit_post$postCov)
+sum(postMean-pogit_post$postMean)
+sum(postCov-pogit_post$postCov)
 ```
 
-### Putting it all together in NIMBLE
+### Testing
 
-Finally, we put everything together in a NIMBLE sampler;
+Now we can try running the functions together, and get some posterior samples:
+
+```{r run_mcmc}
+X <- cbind(1,x)
+# define some constants
+    # number of target parameters
+    response.nodes <- y
+    n.param.nodes <- dim(X)[2]
+    n.response.nodes <- dim(X)[1]
+    n.zero.response.nodes <- sum(y==0)
+    # prior parameters, should get these based on "target"
+    bPriorMean = numeric(n.param.nodes) # still replace if different
+    bPriorCov = diag(n.param.nodes) # still replace if different
+    # mixture components
+    # v: variances (s), m: means (m), w: weights
+    mcomp <- pogit:::mixcomp_poisson()
+    mcompm <- mcomp$m
+    mcompv <- mcomp$v
+    mcompw <- mcomp$w
+    # initialize R, indicator variables
+    R1 <- rep(NA_real_, n.response.nodes)
+    R2 <- rep(NA_real_, n.response.nodes-n.zero.response.nodes)
+    tau <- matrix(NA_real_, n.response.nodes,ncol=2)
+    # start by getting mixture components, this is "get_mixcomp" in pogit
+    # m: means for mixture components, v: scales, w: weights
+    if(sum(response.nodes<3e4)==n.response.nodes){
+      my = mcomp$m[response.nodes[response.nodes>0],]
+      vy = mcomp$v[response.nodes[response.nodes>0],]
+      wy = mcomp$w[response.nodes[response.nodes>0],]
+    }else{
+      wy = vy = my = matrix(0, nrow = n.response.nodes - n.zero.response.nodes, ncol = 10)
+      my[response.nodes[response.nodes>0] <= 3e4,1:dim(mcomp$m)[2]] = mcomp$m[response.nodes[(response.nodes>0) & (response.nodes <= 3e4)],]
+      vy[response.nodes[response.nodes>0] <= 3e4,1:dim(mcomp$v)[2]] = mcomp$v[response.nodes[(response.nodes>0) & (response.nodes <= 3e4)],]
+      wy[response.nodes[response.nodes>0] <= 3e4,1:dim(mcomp$w)[2]] = mcomp$w[response.nodes[(response.nodes>0) & (response.nodes <= 3e4)],]
+      # this comes from "compute_mixture.R"
+      for(i in response.nodes[response.nodes>3e4]){
+        my[response.nodes[response.nodes>0]==i,1] <- -digamma(i)
+        vy[response.nodes[response.nodes>0]==i,1] <- trigamma(i)
+        wy[response.nodes[response.nodes>0]==i,1] <- 1 
+      }
+    }
+    vy[is.na(vy)] <- 0
+    my[is.na(my)] <- 0
+    wy[is.na(wy)] <- 0
+    # for use in step 3
+    c1 <- t(matrix(log(mcompw[1, ]) - 0.5*log(mcompv[1, ]), nrow = 10, ncol = n.response.nodes)) # not sure what this is yet
+n.iter = 1e3
+samples <- NULL
+beta <- rnorm(2) # initialize
+lp = X%*%beta # create linear predictor
+lambda = exp(lp) # distributional parameter
+tau <- update_tau(response.nodes, N, n.zero.response.nodes, lambda) # intitialize tau
+R1 <- update_R1(N, lp, tau[,1], mcomp$m, mcompv = mcomp$v, c1)# initialize R1
+R2 <- update_R2(response.nodes, N, n.zero.response.nodes, lp, tau[y>0,2], vy, my, wy)  # initialize R2
+pb = txtProgressBar(min = 0, max = n.iter, initial = 0) # progress bar. because, why not!
+
+for(i in 1:n.iter){
+# calculate posterior moments
+  calc_post_mom(X, N, n.zero.response.nodes, y, R1, R2, tau, mcomp$v, mcomp$m, my, vy)
+  # simulate from posterior
+  beta <- rmnorm_chol(1, mean = c(postMean), cholesky = chol(postCov), prec_param = 0)
+  # store sample
+  samples <- rbind(samples, beta)
+  # update lp, lambda
+  lp = X%*%beta # linear predictor
+  lambda = exp(lp) # distributional parameter
+  tau <- update_tau(response.nodes, N, n.zero.response.nodes, lambda) # update tau
+  R1 <- update_R1(N, lp, tau[,1], mcomp$m, mcompv = mcomp$v, c1)# update R1
+  R2 <- update_R2(response.nodes, N, n.zero.response.nodes, lp, tau[y>0,2], vy, my, wy)  # update R2
+  setTxtProgressBar(pb,i)
+}
+summary(coda::as.mcmc(samples)) # correct!
+```
+
+### Putting it in NIMBLE
+
+Nimble runs things in C++ so it will be faster, and we can combine it with other samplers and fun tricks. So, here we go:
 
 ```{r nim_samp}
 # sampler for Poisson responses based on Fruhwirth-Schnatter and Wagner 2006 and Fruhwirth-Schnatter et al. 2009
@@ -311,7 +388,7 @@ sampler_glm_pois <- nimbleFunction(
     bPriorCov = diag(n.param.nodes) # still replace if different
     # mixture components
     # v: variances (s), m: means (m), w: weights
-    mcomp <- if(!is.null(control$mcomp)) control$mcomp else mcomp <- pogit:::mixcomp_poisson()
+    mcomp <- pogit:::mixcomp_poisson()
     mcompm <- mcomp$m
     mcompv <- mcomp$v
     mcompw <- mcomp$w

@@ -357,7 +357,7 @@ Attaching package: 'nimble'</code></pre>
 </div>
 <p>and my function, only for testing purposes here:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>my_post_calc <span class="ot">&lt;-</span> <span class="cf">function</span>(X, n.response.nodes, n.zero.response.nodes, response.nodes, R1, R2, tau, mcompv, mcompm, my, vy){</span>
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>calc_post_mom <span class="ot">&lt;-</span> <span class="cf">function</span>(<span class="at">X =</span> <span class="fu">double</span>(<span class="dv">2</span>), <span class="at">n.response.nodes =</span> <span class="fu">integer</span>(), <span class="at">n.zero.response.nodes =</span> <span class="fu">integer</span>(), <span class="at">response.nodes =</span> <span class="fu">integer</span>(<span class="dv">1</span>), <span class="at">R1 =</span> <span class="fu">integer</span>(<span class="dv">1</span>), <span class="at">R2 =</span> <span class="fu">integer</span>(<span class="dv">1</span>), <span class="at">tau =</span> <span class="fu">double</span>(<span class="dv">2</span>), <span class="at">mcompv =</span> <span class="fu">double</span>(<span class="dv">2</span>), <span class="at">mcompm =</span> <span class="fu">double</span>(<span class="dv">2</span>), <span class="at">my =</span> <span class="fu">double</span>(<span class="dv">2</span>), <span class="at">vy =</span> <span class="fu">double</span>(<span class="dv">2</span>)){</span>
 <span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>    X <span class="ot">&lt;-</span> <span class="fu">as.matrix</span>(X)</span>
 <span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>    n.param.nodes <span class="ot">&lt;-</span> <span class="fu">ncol</span>(X)</span>
 <span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>    m1 <span class="ot">&lt;-</span> mcompm[<span class="dv">1</span>,R1]</span>
@@ -384,293 +384,392 @@ Attaching package: 'nimble'</code></pre>
 <span id="cb18-25"><a href="#cb18-25" aria-hidden="true" tabindex="-1"></a>    bPostMean <span class="ot">=</span> bPostCov<span class="sc">%*%</span>(<span class="fu">solve</span>(bPriorCov,<span class="fu">diag</span>(n.param.nodes))<span class="sc">%*%</span>bPriorMean<span class="sc">+</span> (<span class="fu">t</span>(X)<span class="sc">%*%</span><span class="fu">diag</span>(<span class="dv">1</span><span class="sc">/</span><span class="fu">sqrt</span>(v1))<span class="sc">%*%</span>ys1<span class="sc">+</span><span class="fu">t</span>(X[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>,])<span class="sc">%*%</span><span class="fu">diag</span>(<span class="dv">1</span><span class="sc">/</span><span class="fu">sqrt</span>(v2))<span class="sc">%*%</span>ys2)) <span class="co"># see eq (8) Fruhwirth-Schnatter and Wagner 2006 or L109-111 from pogit::select_poisson.Rs</span></span>
 <span id="cb18-26"><a href="#cb18-26" aria-hidden="true" tabindex="-1"></a>    <span class="co"># a sample from the posterior</span></span>
 <span id="cb18-27"><a href="#cb18-27" aria-hidden="true" tabindex="-1"></a>    proposal <span class="ot">&lt;-</span> <span class="fu">rmnorm_chol</span>(<span class="dv">1</span>, <span class="at">mean =</span> <span class="fu">c</span>(bPostMean), <span class="at">cholesky =</span> <span class="fu">chol</span>(bPostCov), <span class="at">prec_param =</span> <span class="dv">0</span>)</span>
-<span id="cb18-28"><a href="#cb18-28" aria-hidden="true" tabindex="-1"></a><span class="fu">return</span>(<span class="fu">list</span>(<span class="at">postMean =</span> bPostMean, <span class="at">postCov =</span> bPostCov, <span class="at">proposal =</span> proposal))</span>
-<span id="cb18-29"><a href="#cb18-29" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb18-28"><a href="#cb18-28" aria-hidden="true" tabindex="-1"></a>    postMean <span class="ot">&lt;&lt;-</span> bPostMean</span>
+<span id="cb18-29"><a href="#cb18-29" aria-hidden="true" tabindex="-1"></a>    postCov <span class="ot">&lt;&lt;-</span> bPostCov</span>
+<span id="cb18-30"><a href="#cb18-30" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>test it:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">1</span>);my_post <span class="ot">&lt;-</span> <span class="fu">my_post_calc</span>(<span class="fu">cbind</span>(<span class="dv">1</span>,x), N, <span class="fu">sum</span>(y<span class="sc">==</span><span class="dv">0</span>), y, pogit_R[<span class="dv">1</span><span class="sc">:</span>N], pogit_R[<span class="sc">-</span><span class="fu">c</span>(<span class="dv">1</span><span class="sc">:</span>N)], my_tau, mcomp<span class="sc">$</span>v, mcomp<span class="sc">$</span>m, compmix.pois<span class="sc">$</span>my, compmix.pois<span class="sc">$</span>vy)</span>
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">1</span>);my_post <span class="ot">&lt;-</span> <span class="fu">calc_post_mom</span>(<span class="fu">cbind</span>(<span class="dv">1</span>,x), N, <span class="fu">sum</span>(y<span class="sc">==</span><span class="dv">0</span>), y, pogit_R[<span class="dv">1</span><span class="sc">:</span>N], pogit_R[<span class="sc">-</span><span class="fu">c</span>(<span class="dv">1</span><span class="sc">:</span>N)], my_tau, mcomp<span class="sc">$</span>v, mcomp<span class="sc">$</span>m, compmix.pois<span class="sc">$</span>my, compmix.pois<span class="sc">$</span>vy)</span>
 <span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">1</span>);pogit_post <span class="ot">&lt;-</span> <span class="fu">pogit_post_calc</span>(<span class="fu">cbind</span>(<span class="dv">1</span>,x),compmix,pogit_tau<span class="sc">$</span>t1, pogit_tau<span class="sc">$</span>t2, pogit_R, cm1)</span>
-<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a><span class="fu">sum</span>(my_post<span class="sc">$</span>postMean<span class="sc">-</span>pogit_post<span class="sc">$</span>postMean)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a><span class="fu">sum</span>(postMean<span class="sc">-</span>pogit_post<span class="sc">$</span>postMean)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1] 9.992007e-16</code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sum</span>(my_post<span class="sc">$</span>postCov<span class="sc">-</span>pogit_post<span class="sc">$</span>postCov)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sum</span>(postCov<span class="sc">-</span>pogit_post<span class="sc">$</span>postCov)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1] 2.710505e-20</code></pre>
 </div>
 </div>
 </section>
-<section id="putting-it-all-together-in-nimble" class="level3">
-<h3 class="anchored" data-anchor-id="putting-it-all-together-in-nimble">Putting it all together in NIMBLE</h3>
-<p>Finally, we put everything together in a NIMBLE sampler;</p>
+<section id="testing" class="level3">
+<h3 class="anchored" data-anchor-id="testing">Testing</h3>
+<p>Now we can try running the functions together, and get some posterior samples:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="co"># sampler for Poisson responses based on Fruhwirth-Schnatter and Wagner 2006 and Fruhwirth-Schnatter et al. 2009</span></span>
-<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a><span class="co"># as implemented in the JAGS and the pogit packages</span></span>
-<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>sampler_glm_pois <span class="ot">&lt;-</span> <span class="fu">nimbleFunction</span>(</span>
-<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">contains =</span> sampler_BASE,</span>
-<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">name =</span> <span class="st">'sampler_glm_pois'</span>,</span>
-<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">setup =</span> <span class="cf">function</span>(model, mvSaved, target, control) {</span>
-<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a>    <span class="co"># get response data nodes</span></span>
-<span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a>    response.nodes.names <span class="ot">&lt;-</span> <span class="fu">names</span>(<span class="fu">which</span>(model<span class="sc">$</span><span class="fu">isStoch</span>(<span class="fu">names</span>(model<span class="sc">$</span>origData)))) <span class="co"># names of response nodes</span></span>
-<span id="cb23-10"><a href="#cb23-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span>(<span class="sc">!</span><span class="fu">all</span>(model<span class="sc">$</span><span class="fu">getDistribution</span>(response.nodes.names)<span class="sc">==</span><span class="st">"dpois"</span>))<span class="fu">stop</span>(<span class="st">"This sampler is designed only for Poisson responses."</span>)</span>
-<span id="cb23-11"><a href="#cb23-11" aria-hidden="true" tabindex="-1"></a>    response.name  <span class="ot">=</span> <span class="fu">unique</span>(<span class="fu">gsub</span>(<span class="st">"</span><span class="sc">\\</span><span class="st">[.*"</span>,<span class="st">""</span>,response.nodes.names))</span>
-<span id="cb23-12"><a href="#cb23-12" aria-hidden="true" tabindex="-1"></a>    response.nodes <span class="ot">&lt;-</span> <span class="fu">values</span>(model, response.nodes.names) <span class="co"># response data</span></span>
-<span id="cb23-13"><a href="#cb23-13" aria-hidden="true" tabindex="-1"></a>    n.response.nodes <span class="ot">&lt;-</span> <span class="fu">length</span>(response.nodes) <span class="co"># number of observations</span></span>
-<span id="cb23-14"><a href="#cb23-14" aria-hidden="true" tabindex="-1"></a>    n.zero.response.nodes <span class="ot">=</span> <span class="fu">sum</span>(response.nodes<span class="sc">==</span><span class="dv">0</span>) <span class="co"># number of zero observations</span></span>
-<span id="cb23-15"><a href="#cb23-15" aria-hidden="true" tabindex="-1"></a>    <span class="do">## get distribution parameter names</span></span>
-<span id="cb23-16"><a href="#cb23-16" aria-hidden="true" tabindex="-1"></a>    dist.par.names <span class="ot">=</span> model<span class="sc">$</span><span class="fu">getParents</span>(response.nodes.names,<span class="at">determOnly =</span> F, <span class="at">immediateOnly =</span> T)</span>
-<span id="cb23-17"><a href="#cb23-17" aria-hidden="true" tabindex="-1"></a>    distpar.name  <span class="ot">=</span> <span class="fu">unique</span>(<span class="fu">gsub</span>(<span class="st">"</span><span class="sc">\\</span><span class="st">[.*"</span>,<span class="st">""</span>,dist.par.names))</span>
-<span id="cb23-18"><a href="#cb23-18" aria-hidden="true" tabindex="-1"></a>    lp.nodes.names <span class="ot">=</span> model<span class="sc">$</span><span class="fu">getParents</span>(dist.par.names,<span class="at">immediateOnly =</span> T, <span class="at">determOnly =</span> T,<span class="at">includeData =</span> F)</span>
-<span id="cb23-19"><a href="#cb23-19" aria-hidden="true" tabindex="-1"></a>    lp.name  <span class="ot">=</span> <span class="fu">unique</span>(<span class="fu">gsub</span>(<span class="st">"</span><span class="sc">\\</span><span class="st">[.*"</span>,<span class="st">""</span>,lp.nodes.names))</span>
-<span id="cb23-20"><a href="#cb23-20" aria-hidden="true" tabindex="-1"></a>    <span class="co"># get corresponding "data" nodes to target, should do this automatically based o "target"</span></span>
-<span id="cb23-21"><a href="#cb23-21" aria-hidden="true" tabindex="-1"></a>    X <span class="ot">&lt;-</span> model<span class="sc">$</span>X</span>
-<span id="cb23-22"><a href="#cb23-22" aria-hidden="true" tabindex="-1"></a>    <span class="co"># number of target parameters</span></span>
-<span id="cb23-23"><a href="#cb23-23" aria-hidden="true" tabindex="-1"></a>    n.param.nodes <span class="ot">&lt;-</span> <span class="fu">dim</span>(X)[<span class="dv">2</span>]</span>
-<span id="cb23-24"><a href="#cb23-24" aria-hidden="true" tabindex="-1"></a>    <span class="co"># prior parameters, should get these based on "target"</span></span>
-<span id="cb23-25"><a href="#cb23-25" aria-hidden="true" tabindex="-1"></a>    bPriorMean <span class="ot">=</span> <span class="fu">numeric</span>(n.param.nodes) <span class="co"># still replace if different</span></span>
-<span id="cb23-26"><a href="#cb23-26" aria-hidden="true" tabindex="-1"></a>    bPriorCov <span class="ot">=</span> <span class="fu">diag</span>(n.param.nodes) <span class="co"># still replace if different</span></span>
-<span id="cb23-27"><a href="#cb23-27" aria-hidden="true" tabindex="-1"></a>    <span class="co"># mixture components</span></span>
-<span id="cb23-28"><a href="#cb23-28" aria-hidden="true" tabindex="-1"></a>    <span class="co"># v: variances (s), m: means (m), w: weights</span></span>
-<span id="cb23-29"><a href="#cb23-29" aria-hidden="true" tabindex="-1"></a>    mcomp <span class="ot">&lt;-</span> <span class="cf">if</span>(<span class="sc">!</span><span class="fu">is.null</span>(control<span class="sc">$</span>mcomp)) control<span class="sc">$</span>mcomp <span class="cf">else</span> mcomp <span class="ot">&lt;-</span> pogit<span class="sc">:::</span><span class="fu">mixcomp_poisson</span>()</span>
-<span id="cb23-30"><a href="#cb23-30" aria-hidden="true" tabindex="-1"></a>    mcompm <span class="ot">&lt;-</span> mcomp<span class="sc">$</span>m</span>
-<span id="cb23-31"><a href="#cb23-31" aria-hidden="true" tabindex="-1"></a>    mcompv <span class="ot">&lt;-</span> mcomp<span class="sc">$</span>v</span>
-<span id="cb23-32"><a href="#cb23-32" aria-hidden="true" tabindex="-1"></a>    mcompw <span class="ot">&lt;-</span> mcomp<span class="sc">$</span>w</span>
-<span id="cb23-33"><a href="#cb23-33" aria-hidden="true" tabindex="-1"></a>    <span class="co"># initialize R, indicator variables</span></span>
-<span id="cb23-34"><a href="#cb23-34" aria-hidden="true" tabindex="-1"></a>    R1 <span class="ot">&lt;-</span> <span class="fu">rep</span>(<span class="cn">NA_real_</span>, n.response.nodes)</span>
-<span id="cb23-35"><a href="#cb23-35" aria-hidden="true" tabindex="-1"></a>    R2 <span class="ot">&lt;-</span> <span class="fu">rep</span>(<span class="cn">NA_real_</span>, n.response.nodes<span class="sc">-</span>n.zero.response.nodes)</span>
-<span id="cb23-36"><a href="#cb23-36" aria-hidden="true" tabindex="-1"></a>    tau <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="cn">NA_real_</span>, n.response.nodes,<span class="at">ncol=</span><span class="dv">2</span>)</span>
-<span id="cb23-37"><a href="#cb23-37" aria-hidden="true" tabindex="-1"></a>    <span class="co"># start by getting mixture components, this is "get_mixcomp" in pogit</span></span>
-<span id="cb23-38"><a href="#cb23-38" aria-hidden="true" tabindex="-1"></a>    <span class="co"># m: means for mixture components, v: scales, w: weights</span></span>
-<span id="cb23-39"><a href="#cb23-39" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span>(<span class="fu">sum</span>(response.nodes<span class="sc">&lt;</span><span class="fl">3e4</span>)<span class="sc">==</span>n.response.nodes){</span>
-<span id="cb23-40"><a href="#cb23-40" aria-hidden="true" tabindex="-1"></a>      my <span class="ot">=</span> mcomp<span class="sc">$</span>m[response.nodes[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>],]</span>
-<span id="cb23-41"><a href="#cb23-41" aria-hidden="true" tabindex="-1"></a>      vy <span class="ot">=</span> mcomp<span class="sc">$</span>v[response.nodes[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>],]</span>
-<span id="cb23-42"><a href="#cb23-42" aria-hidden="true" tabindex="-1"></a>      wy <span class="ot">=</span> mcomp<span class="sc">$</span>w[response.nodes[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>],]</span>
-<span id="cb23-43"><a href="#cb23-43" aria-hidden="true" tabindex="-1"></a>    }<span class="cf">else</span>{</span>
-<span id="cb23-44"><a href="#cb23-44" aria-hidden="true" tabindex="-1"></a>      wy <span class="ot">=</span> vy <span class="ot">=</span> my <span class="ot">=</span> <span class="fu">matrix</span>(<span class="dv">0</span>, <span class="at">nrow =</span> n.response.nodes <span class="sc">-</span> n.zero.response.nodes, <span class="at">ncol =</span> <span class="dv">10</span>)</span>
-<span id="cb23-45"><a href="#cb23-45" aria-hidden="true" tabindex="-1"></a>      my[response.nodes[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>] <span class="sc">&lt;=</span> <span class="fl">3e4</span>,<span class="dv">1</span><span class="sc">:</span><span class="fu">dim</span>(mcomp<span class="sc">$</span>m)[<span class="dv">2</span>]] <span class="ot">=</span> mcomp<span class="sc">$</span>m[response.nodes[(response.nodes<span class="sc">&gt;</span><span class="dv">0</span>) <span class="sc">&amp;</span> (response.nodes <span class="sc">&lt;=</span> <span class="fl">3e4</span>)],]</span>
-<span id="cb23-46"><a href="#cb23-46" aria-hidden="true" tabindex="-1"></a>      vy[response.nodes[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>] <span class="sc">&lt;=</span> <span class="fl">3e4</span>,<span class="dv">1</span><span class="sc">:</span><span class="fu">dim</span>(mcomp<span class="sc">$</span>v)[<span class="dv">2</span>]] <span class="ot">=</span> mcomp<span class="sc">$</span>v[response.nodes[(response.nodes<span class="sc">&gt;</span><span class="dv">0</span>) <span class="sc">&amp;</span> (response.nodes <span class="sc">&lt;=</span> <span class="fl">3e4</span>)],]</span>
-<span id="cb23-47"><a href="#cb23-47" aria-hidden="true" tabindex="-1"></a>      wy[response.nodes[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>] <span class="sc">&lt;=</span> <span class="fl">3e4</span>,<span class="dv">1</span><span class="sc">:</span><span class="fu">dim</span>(mcomp<span class="sc">$</span>w)[<span class="dv">2</span>]] <span class="ot">=</span> mcomp<span class="sc">$</span>w[response.nodes[(response.nodes<span class="sc">&gt;</span><span class="dv">0</span>) <span class="sc">&amp;</span> (response.nodes <span class="sc">&lt;=</span> <span class="fl">3e4</span>)],]</span>
-<span id="cb23-48"><a href="#cb23-48" aria-hidden="true" tabindex="-1"></a>      <span class="co"># this comes from "compute_mixture.R"</span></span>
-<span id="cb23-49"><a href="#cb23-49" aria-hidden="true" tabindex="-1"></a>      <span class="cf">for</span>(i <span class="cf">in</span> response.nodes[response.nodes<span class="sc">&gt;</span><span class="fl">3e4</span>]){</span>
-<span id="cb23-50"><a href="#cb23-50" aria-hidden="true" tabindex="-1"></a>        my[response.nodes[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>]<span class="sc">==</span>i,<span class="dv">1</span>] <span class="ot">&lt;-</span> <span class="sc">-</span><span class="fu">digamma</span>(i)</span>
-<span id="cb23-51"><a href="#cb23-51" aria-hidden="true" tabindex="-1"></a>        vy[response.nodes[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>]<span class="sc">==</span>i,<span class="dv">1</span>] <span class="ot">&lt;-</span> <span class="fu">trigamma</span>(i)</span>
-<span id="cb23-52"><a href="#cb23-52" aria-hidden="true" tabindex="-1"></a>        wy[response.nodes[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>]<span class="sc">==</span>i,<span class="dv">1</span>] <span class="ot">&lt;-</span> <span class="dv">1</span> </span>
-<span id="cb23-53"><a href="#cb23-53" aria-hidden="true" tabindex="-1"></a>      }</span>
-<span id="cb23-54"><a href="#cb23-54" aria-hidden="true" tabindex="-1"></a>    }</span>
-<span id="cb23-55"><a href="#cb23-55" aria-hidden="true" tabindex="-1"></a>    vy[<span class="fu">is.na</span>(vy)] <span class="ot">&lt;-</span> <span class="dv">0</span></span>
-<span id="cb23-56"><a href="#cb23-56" aria-hidden="true" tabindex="-1"></a>    my[<span class="fu">is.na</span>(my)] <span class="ot">&lt;-</span> <span class="dv">0</span></span>
-<span id="cb23-57"><a href="#cb23-57" aria-hidden="true" tabindex="-1"></a>    wy[<span class="fu">is.na</span>(wy)] <span class="ot">&lt;-</span> <span class="dv">0</span></span>
-<span id="cb23-58"><a href="#cb23-58" aria-hidden="true" tabindex="-1"></a>    <span class="co"># for use in step 3</span></span>
-<span id="cb23-59"><a href="#cb23-59" aria-hidden="true" tabindex="-1"></a>    c1 <span class="ot">&lt;-</span> <span class="fu">t</span>(<span class="fu">matrix</span>(<span class="fu">log</span>(mcompw[<span class="dv">1</span>, ]) <span class="sc">-</span> <span class="fl">0.5</span><span class="sc">*</span><span class="fu">log</span>(mcompv[<span class="dv">1</span>, ]), <span class="at">nrow =</span> <span class="dv">10</span>, <span class="at">ncol =</span> n.response.nodes)) <span class="co"># not sure what this is yet</span></span>
-<span id="cb23-60"><a href="#cb23-60" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb23-61"><a href="#cb23-61" aria-hidden="true" tabindex="-1"></a>    calcNodes <span class="ot">&lt;-</span> model<span class="sc">$</span><span class="fu">getDependencies</span>(target)</span>
-<span id="cb23-62"><a href="#cb23-62" aria-hidden="true" tabindex="-1"></a>    model<span class="sc">$</span><span class="fu">simulate</span>()</span>
-<span id="cb23-63"><a href="#cb23-63" aria-hidden="true" tabindex="-1"></a>    model<span class="sc">$</span><span class="fu">calculate</span>(calcNodes)</span>
-<span id="cb23-64"><a href="#cb23-64" aria-hidden="true" tabindex="-1"></a>    targetAsScalar <span class="ot">&lt;-</span> model<span class="sc">$</span><span class="fu">expandNodeNames</span>(target, <span class="at">returnScalarComponents =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb23-65"><a href="#cb23-65" aria-hidden="true" tabindex="-1"></a>  },</span>
-<span id="cb23-66"><a href="#cb23-66" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb23-67"><a href="#cb23-67" aria-hidden="true" tabindex="-1"></a>  <span class="at">run =</span> <span class="cf">function</span>() {</span>
-<span id="cb23-68"><a href="#cb23-68" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 1. simulate parameters given R, tau</span></span>
-<span id="cb23-69"><a href="#cb23-69" aria-hidden="true" tabindex="-1"></a>    <span class="co"># this part is covered in "select_poisson.R"</span></span>
-<span id="cb23-70"><a href="#cb23-70" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span>(<span class="sc">!</span><span class="fu">any_na</span>(R1)){ <span class="co"># I don't update parameters on the first iteration as to generate sensible "warm" start for R1,R2,t1,t2</span></span>
-<span id="cb23-71"><a href="#cb23-71" aria-hidden="true" tabindex="-1"></a>    <span class="co"># first mixture component means</span></span>
-<span id="cb23-72"><a href="#cb23-72" aria-hidden="true" tabindex="-1"></a>    m1 <span class="ot">&lt;-</span> mcompm[<span class="dv">1</span>,R1]</span>
-<span id="cb23-73"><a href="#cb23-73" aria-hidden="true" tabindex="-1"></a>    m2 <span class="ot">&lt;-</span> <span class="fu">numeric</span>(n.response.nodes<span class="sc">-</span>n.zero.response.nodes)</span>
-<span id="cb23-74"><a href="#cb23-74" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>(n.response.nodes<span class="sc">-</span>n.zero.response.nodes)){</span>
-<span id="cb23-75"><a href="#cb23-75" aria-hidden="true" tabindex="-1"></a>      m2[i] <span class="ot">&lt;-</span> my[i,R2[i]]</span>
-<span id="cb23-76"><a href="#cb23-76" aria-hidden="true" tabindex="-1"></a>    }</span>
-<span id="cb23-77"><a href="#cb23-77" aria-hidden="true" tabindex="-1"></a>    <span class="co"># second: mixture component variances</span></span>
-<span id="cb23-78"><a href="#cb23-78" aria-hidden="true" tabindex="-1"></a>    v1 <span class="ot">&lt;-</span> mcompv[<span class="dv">1</span>,R1]</span>
-<span id="cb23-79"><a href="#cb23-79" aria-hidden="true" tabindex="-1"></a>    v2 <span class="ot">&lt;-</span> <span class="fu">numeric</span>(n.response.nodes<span class="sc">-</span>n.zero.response.nodes)</span>
-<span id="cb23-80"><a href="#cb23-80" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>(n.response.nodes<span class="sc">-</span>n.zero.response.nodes)){</span>
-<span id="cb23-81"><a href="#cb23-81" aria-hidden="true" tabindex="-1"></a>      v2[i] <span class="ot">&lt;-</span> vy[i,R2[i]]</span>
-<span id="cb23-82"><a href="#cb23-82" aria-hidden="true" tabindex="-1"></a>    }</span>
-<span id="cb23-83"><a href="#cb23-83" aria-hidden="true" tabindex="-1"></a>    invSigS <span class="ot">=</span> <span class="fu">numeric</span>(n.response.nodes)</span>
-<span id="cb23-84"><a href="#cb23-84" aria-hidden="true" tabindex="-1"></a>    ys1 <span class="ot">=</span> (<span class="sc">-</span><span class="fu">log</span>(tau[,<span class="dv">1</span>])<span class="sc">-</span>m1)<span class="sc">/</span><span class="fu">sqrt</span>(v1) <span class="co"># this is also "AuxMixPoisson:value()" in JAGS</span></span>
-<span id="cb23-85"><a href="#cb23-85" aria-hidden="true" tabindex="-1"></a>    ys2 <span class="ot">=</span> (<span class="sc">-</span><span class="fu">log</span>(tau[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>,<span class="dv">2</span>])<span class="sc">-</span>m2)<span class="sc">/</span><span class="fu">sqrt</span>(v2)</span>
-<span id="cb23-86"><a href="#cb23-86" aria-hidden="true" tabindex="-1"></a>    invSigS <span class="ot">=</span> <span class="dv">1</span><span class="sc">/</span>v1</span>
-<span id="cb23-87"><a href="#cb23-87" aria-hidden="true" tabindex="-1"></a>    invSigS[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>] <span class="ot">=</span> invSigS[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>]<span class="sc">+</span><span class="dv">1</span><span class="sc">/</span>v2</span>
-<span id="cb23-88"><a href="#cb23-88" aria-hidden="true" tabindex="-1"></a>    v1mat <span class="ot">=</span> <span class="fu">matrix</span>()</span>
-<span id="cb23-89"><a href="#cb23-89" aria-hidden="true" tabindex="-1"></a>    <span class="co"># posterior parameters</span></span>
-<span id="cb23-90"><a href="#cb23-90" aria-hidden="true" tabindex="-1"></a>    bPostCov <span class="ot">=</span> <span class="fu">solve</span>(<span class="fu">solve</span>(bPriorCov, <span class="fu">diag</span>(n.param.nodes)) <span class="sc">+</span> <span class="fu">t</span>(X)<span class="sc">%*%</span><span class="fu">diag</span>(invSigS)<span class="sc">%*%</span>X ,<span class="fu">diag</span>(<span class="dv">2</span>))</span>
-<span id="cb23-91"><a href="#cb23-91" aria-hidden="true" tabindex="-1"></a>    bPostMean <span class="ot">=</span> bPostCov<span class="sc">%*%</span>(<span class="fu">solve</span>(bPriorCov,<span class="fu">diag</span>(n.param.nodes))<span class="sc">%*%</span>bPriorMean<span class="sc">+</span> <span class="fu">t</span>(X)<span class="sc">%*%</span><span class="fu">diag</span>(<span class="dv">1</span><span class="sc">/</span><span class="fu">sqrt</span>(v1))<span class="sc">%*%</span>ys1<span class="sc">+</span><span class="fu">t</span>(X[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>,])<span class="sc">%*%</span><span class="fu">diag</span>(<span class="dv">1</span><span class="sc">/</span><span class="fu">sqrt</span>(v2))<span class="sc">%*%</span>ys2) <span class="co"># see eq (8) Fruhwirth-Schnatter and Wagner 2006 or L109-111 from pogit::select_poisson.Rs</span></span>
-<span id="cb23-92"><a href="#cb23-92" aria-hidden="true" tabindex="-1"></a>    <span class="co"># a sample from the posterior</span></span>
-<span id="cb23-93"><a href="#cb23-93" aria-hidden="true" tabindex="-1"></a>    proposal <span class="ot">&lt;-</span> <span class="fu">rmnorm_chol</span>(<span class="dv">1</span>, <span class="at">mean =</span> <span class="fu">c</span>(bPostMean), <span class="at">cholesky =</span> <span class="fu">chol</span>(bPostCov), <span class="at">prec_param =</span> <span class="dv">0</span>)</span>
-<span id="cb23-94"><a href="#cb23-94" aria-hidden="true" tabindex="-1"></a>    <span class="fu">values</span>(model, targetAsScalar) <span class="ot">&lt;&lt;-</span>  proposal</span>
-<span id="cb23-95"><a href="#cb23-95" aria-hidden="true" tabindex="-1"></a>    <span class="co"># update lp, lambda after calculating proposal</span></span>
-<span id="cb23-96"><a href="#cb23-96" aria-hidden="true" tabindex="-1"></a>    model<span class="sc">$</span><span class="fu">calculate</span>(calcNodes)</span>
-<span id="cb23-97"><a href="#cb23-97" aria-hidden="true" tabindex="-1"></a>    }</span>
-<span id="cb23-98"><a href="#cb23-98" aria-hidden="true" tabindex="-1"></a>    <span class="do">## get LP and mu</span></span>
-<span id="cb23-99"><a href="#cb23-99" aria-hidden="true" tabindex="-1"></a>    lp <span class="ot">=</span> <span class="fu">values</span>(model, lp.nodes.names)</span>
-<span id="cb23-100"><a href="#cb23-100" aria-hidden="true" tabindex="-1"></a>    lambda <span class="ot">=</span> <span class="fu">values</span>(model, dist.par.names)</span>
-<span id="cb23-101"><a href="#cb23-101" aria-hidden="true" tabindex="-1"></a>    <span class="co">#2. update tau's, step 1 in Fruhwirth-Schnatter et al. 2009</span></span>
-<span id="cb23-102"><a href="#cb23-102" aria-hidden="true" tabindex="-1"></a>    <span class="co"># this part is covered in dataug_pois_iams.R-&gt;iams1_poisson</span></span>
-<span id="cb23-103"><a href="#cb23-103" aria-hidden="true" tabindex="-1"></a>    <span class="co"># tau are latent variables that represent the inter-arrival times of a Poisson process</span></span>
-<span id="cb23-104"><a href="#cb23-104" aria-hidden="true" tabindex="-1"></a>    <span class="co"># get_mixcomp_poisson in dataug_pois_iams.R just gets components that we need for the other functions</span></span>
-<span id="cb23-105"><a href="#cb23-105" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb23-106"><a href="#cb23-106" aria-hidden="true" tabindex="-1"></a>    <span class="fu">update_tau</span>(response.nodes, n.response.nodes, n.zero.response.nodes, lambda)</span>
-<span id="cb23-107"><a href="#cb23-107" aria-hidden="true" tabindex="-1"></a>    t1 <span class="ot">&lt;-</span> tau[,<span class="dv">1</span>]</span>
-<span id="cb23-108"><a href="#cb23-108" aria-hidden="true" tabindex="-1"></a>    t2 <span class="ot">&lt;-</span> tau[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>,<span class="dv">2</span>]</span>
-<span id="cb23-109"><a href="#cb23-109" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 3. update R's, step 2 in Fruhwirth-Schnatter et al. 2009</span></span>
-<span id="cb23-110"><a href="#cb23-110" aria-hidden="true" tabindex="-1"></a>    <span class="co"># this part is covered in dataug_pois_iams.R-&gt;iams2_poisson</span></span>
-<span id="cb23-111"><a href="#cb23-111" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Rmix are normal mixture approximations to Poissons</span></span>
-<span id="cb23-112"><a href="#cb23-112" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb23-113"><a href="#cb23-113" aria-hidden="true" tabindex="-1"></a>    <span class="fu">update_R1</span>(n.response.nodes, lp, t1, mcompm, mcompv, c1)</span>
-<span id="cb23-114"><a href="#cb23-114" aria-hidden="true" tabindex="-1"></a>    <span class="fu">update_R2</span>(response.nodes, n.response.nodes, n.zero.response.nodes, lp, t2, vy, my, wy)</span>
-<span id="cb23-115"><a href="#cb23-115" aria-hidden="true" tabindex="-1"></a>    <span class="co"># keep the model and mvSaved objects consistent</span></span>
-<span id="cb23-116"><a href="#cb23-116" aria-hidden="true" tabindex="-1"></a>    <span class="fu">copy</span>(<span class="at">from =</span> model, <span class="at">to =</span> mvSaved, <span class="at">row =</span> <span class="dv">1</span>, </span>
-<span id="cb23-117"><a href="#cb23-117" aria-hidden="true" tabindex="-1"></a>         <span class="at">nodes =</span> target, <span class="at">logProb =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb23-118"><a href="#cb23-118" aria-hidden="true" tabindex="-1"></a>  },</span>
-<span id="cb23-119"><a href="#cb23-119" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb23-120"><a href="#cb23-120" aria-hidden="true" tabindex="-1"></a>  <span class="at">methods =</span> <span class="fu">list</span>(<span class="at">update_tau =</span> <span class="cf">function</span>(<span class="at">response.nodes =</span> <span class="fu">integer</span>(<span class="dv">1</span>), <span class="at">n.response.nodes =</span> <span class="fu">integer</span>(), <span class="at">n.zero.response.nodes =</span> <span class="fu">integer</span>(), <span class="at">lambda =</span> <span class="fu">double</span>(<span class="dv">1</span>)){</span>
-<span id="cb23-121"><a href="#cb23-121" aria-hidden="true" tabindex="-1"></a>                        taunew <span class="ot">=</span> <span class="fu">matrix</span>(<span class="dv">0</span>, <span class="at">nrow =</span> n.response.nodes, <span class="at">ncol =</span> <span class="dv">2</span>)</span>
-<span id="cb23-122"><a href="#cb23-122" aria-hidden="true" tabindex="-1"></a>                        taunew[,<span class="dv">1</span>] <span class="ot">&lt;-</span> <span class="fu">rexp</span>(n.response.nodes, lambda)</span>
-<span id="cb23-123"><a href="#cb23-123" aria-hidden="true" tabindex="-1"></a>                        tau2 <span class="ot">&lt;-</span> <span class="fu">rbeta</span>(n.response.nodes <span class="sc">-</span> n.zero.response.nodes, response.nodes[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>], <span class="dv">1</span>)</span>
-<span id="cb23-124"><a href="#cb23-124" aria-hidden="true" tabindex="-1"></a>                        taunew[response.nodes <span class="sc">&gt;</span> <span class="dv">0</span>,  <span class="dv">1</span>] <span class="ot">=</span> <span class="dv">1</span><span class="sc">-</span>tau2 <span class="sc">+</span> taunew[response.nodes <span class="sc">&gt;</span> <span class="dv">0</span>,<span class="dv">1</span>]</span>
-<span id="cb23-125"><a href="#cb23-125" aria-hidden="true" tabindex="-1"></a>                        taunew[response.nodes <span class="sc">&gt;</span> <span class="dv">0</span>,  <span class="dv">2</span>]  <span class="ot">=</span> tau2</span>
-<span id="cb23-126"><a href="#cb23-126" aria-hidden="true" tabindex="-1"></a>                        taunew[response.nodes <span class="sc">==</span> <span class="dv">0</span>, <span class="dv">1</span>] <span class="ot">=</span> <span class="dv">1</span> <span class="sc">+</span>  taunew[response.nodes <span class="sc">==</span> <span class="dv">0</span>, <span class="dv">1</span>]</span>
-<span id="cb23-127"><a href="#cb23-127" aria-hidden="true" tabindex="-1"></a>                        tau<span class="ot">&lt;&lt;-</span>taunew</span>
-<span id="cb23-128"><a href="#cb23-128" aria-hidden="true" tabindex="-1"></a>                      },</span>
-<span id="cb23-129"><a href="#cb23-129" aria-hidden="true" tabindex="-1"></a>                    <span class="at">update_R1 =</span> <span class="cf">function</span>(<span class="at">n.response.nodes =</span> <span class="fu">integer</span>(), <span class="at">lp =</span> <span class="fu">double</span>(<span class="dv">1</span>), <span class="at">t1 =</span> <span class="fu">double</span>(<span class="dv">1</span>), <span class="at">mcompm =</span> <span class="fu">double</span>(<span class="dv">2</span>), <span class="at">mcompv =</span> <span class="fu">double</span>(<span class="dv">2</span>), <span class="at">c1 =</span> <span class="fu">double</span>(<span class="dv">2</span>))</span>
-<span id="cb23-130"><a href="#cb23-130" aria-hidden="true" tabindex="-1"></a>                      {</span>
-<span id="cb23-131"><a href="#cb23-131" aria-hidden="true" tabindex="-1"></a>                        minlogt1minlp <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="sc">-</span><span class="fu">log</span>(t1) <span class="sc">-</span> lp,<span class="at">ncol=</span><span class="dv">10</span>,<span class="at">nrow=</span>n.response.nodes)</span>
-<span id="cb23-132"><a href="#cb23-132" aria-hidden="true" tabindex="-1"></a>                        repmcompm  <span class="ot">&lt;-</span> <span class="fu">t</span>(<span class="fu">matrix</span>(mcompm[<span class="dv">1</span>,], <span class="at">ncol =</span> n.response.nodes, <span class="at">nrow =</span> <span class="dv">10</span>))</span>
-<span id="cb23-133"><a href="#cb23-133" aria-hidden="true" tabindex="-1"></a>                        repmcompv <span class="ot">&lt;-</span> <span class="fu">t</span>(<span class="fu">matrix</span>(mcompv[<span class="dv">1</span>,], <span class="at">ncol =</span> n.response.nodes, <span class="at">nrow =</span> <span class="dv">10</span>))</span>
-<span id="cb23-134"><a href="#cb23-134" aria-hidden="true" tabindex="-1"></a>                        rgm   <span class="ot">&lt;-</span> c1 <span class="sc">-</span> <span class="fl">0.5</span><span class="sc">*</span>(minlogt1minlp <span class="sc">-</span> repmcompm)<span class="sc">^</span><span class="dv">2</span><span class="sc">/</span>repmcompv</span>
-<span id="cb23-135"><a href="#cb23-135" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>){ <span class="co">#ncol rgm</span></span>
-<span id="cb23-136"><a href="#cb23-136" aria-hidden="true" tabindex="-1"></a>                          rgm[rgm[,i]<span class="sc">==</span><span class="dv">0</span>,i] <span class="ot">&lt;-</span> <span class="sc">-</span><span class="cn">Inf</span></span>
-<span id="cb23-137"><a href="#cb23-137" aria-hidden="true" tabindex="-1"></a>                        }</span>
-<span id="cb23-138"><a href="#cb23-138" aria-hidden="true" tabindex="-1"></a>                        mx <span class="ot">&lt;-</span> <span class="fu">numeric</span>(n.response.nodes)</span>
-<span id="cb23-139"><a href="#cb23-139" aria-hidden="true" tabindex="-1"></a>                        e1 <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="dv">0</span>, <span class="at">ncol =</span> <span class="dv">10</span>, <span class="at">nrow =</span> n.response.nodes)</span>
-<span id="cb23-140"><a href="#cb23-140" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>n.response.nodes){</span>
-<span id="cb23-141"><a href="#cb23-141" aria-hidden="true" tabindex="-1"></a>                          mx[i] <span class="ot">&lt;-</span> <span class="fu">max</span>(rgm[i,])</span>
-<span id="cb23-142"><a href="#cb23-142" aria-hidden="true" tabindex="-1"></a>                          <span class="cf">if</span>(mx[i]<span class="sc">==-</span><span class="cn">Inf</span>)mx[i]<span class="ot">=</span><span class="dv">0</span></span>
-<span id="cb23-143"><a href="#cb23-143" aria-hidden="true" tabindex="-1"></a>                          e1[i,] <span class="ot">&lt;-</span> <span class="fu">exp</span>(rgm[i,]<span class="sc">-</span>mx[i])</span>
-<span id="cb23-144"><a href="#cb23-144" aria-hidden="true" tabindex="-1"></a>                        }</span>
-<span id="cb23-145"><a href="#cb23-145" aria-hidden="true" tabindex="-1"></a>                        rgmod <span class="ot">&lt;-</span> <span class="fu">numeric</span>(n.response.nodes)</span>
-<span id="cb23-146"><a href="#cb23-146" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>n.response.nodes){</span>
-<span id="cb23-147"><a href="#cb23-147" aria-hidden="true" tabindex="-1"></a>                          rgmod[i] <span class="ot">&lt;-</span> <span class="fu">sum</span>(e1[i,])</span>
-<span id="cb23-148"><a href="#cb23-148" aria-hidden="true" tabindex="-1"></a>                        }</span>
-<span id="cb23-149"><a href="#cb23-149" aria-hidden="true" tabindex="-1"></a>                        e1.new <span class="ot">=</span> <span class="fu">matrix</span>(<span class="dv">0</span>, <span class="at">ncol =</span> <span class="dv">10</span>, <span class="at">nrow =</span> n.response.nodes)</span>
-<span id="cb23-150"><a href="#cb23-150" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>){</span>
-<span id="cb23-151"><a href="#cb23-151" aria-hidden="true" tabindex="-1"></a>                          e1.new[,i] <span class="ot">&lt;-</span> e1[,i]<span class="sc">/</span>rgmod <span class="co"># for safety might want to check for 0/0 i.e., nan</span></span>
-<span id="cb23-152"><a href="#cb23-152" aria-hidden="true" tabindex="-1"></a>                        }</span>
-<span id="cb23-153"><a href="#cb23-153" aria-hidden="true" tabindex="-1"></a>                        tri.mat <span class="ot">=</span> <span class="fu">matrix</span>(<span class="dv">1</span>, <span class="dv">10</span>, <span class="dv">10</span>)</span>
-<span id="cb23-154"><a href="#cb23-154" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span> (j <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">9</span>) {</span>
-<span id="cb23-155"><a href="#cb23-155" aria-hidden="true" tabindex="-1"></a>                          <span class="cf">for</span> (i <span class="cf">in</span> (j<span class="sc">+</span><span class="dv">1</span>)<span class="sc">:</span><span class="dv">10</span>) {</span>
-<span id="cb23-156"><a href="#cb23-156" aria-hidden="true" tabindex="-1"></a>                            tri.mat[i,j] <span class="ot">=</span> <span class="dv">0</span></span>
-<span id="cb23-157"><a href="#cb23-157" aria-hidden="true" tabindex="-1"></a>                          }</span>
-<span id="cb23-158"><a href="#cb23-158" aria-hidden="true" tabindex="-1"></a>                        }</span>
-<span id="cb23-159"><a href="#cb23-159" aria-hidden="true" tabindex="-1"></a>                        Fn    <span class="ot">&lt;-</span> e1.new<span class="sc">%*%</span>tri.mat</span>
-<span id="cb23-160"><a href="#cb23-160" aria-hidden="true" tabindex="-1"></a>                        </span>
-<span id="cb23-161"><a href="#cb23-161" aria-hidden="true" tabindex="-1"></a>                        <span class="co"># determination of random indicators R1</span></span>
-<span id="cb23-162"><a href="#cb23-162" aria-hidden="true" tabindex="-1"></a>                        u <span class="ot">&lt;-</span> <span class="fu">runif</span>(n.response.nodes, <span class="dv">0</span>, <span class="dv">1</span>)</span>
-<span id="cb23-163"><a href="#cb23-163" aria-hidden="true" tabindex="-1"></a>                        R1.temp <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="dv">0</span>, <span class="at">ncol =</span> <span class="dv">10</span>, <span class="at">nrow =</span> n.response.nodes)</span>
-<span id="cb23-164"><a href="#cb23-164" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>){</span>
-<span id="cb23-165"><a href="#cb23-165" aria-hidden="true" tabindex="-1"></a>                          R1.temp[,i] <span class="ot">&lt;-</span> u<span class="sc">&lt;</span>Fn[,i] <span class="co">#can probably replace this step by "sample()"?</span></span>
-<span id="cb23-166"><a href="#cb23-166" aria-hidden="true" tabindex="-1"></a>                        }</span>
-<span id="cb23-167"><a href="#cb23-167" aria-hidden="true" tabindex="-1"></a>                        </span>
-<span id="cb23-168"><a href="#cb23-168" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>n.response.nodes){</span>
-<span id="cb23-169"><a href="#cb23-169" aria-hidden="true" tabindex="-1"></a>                          R1[i] <span class="ot">&lt;&lt;-</span> <span class="dv">11</span><span class="sc">-</span><span class="fu">sum</span>(R1.temp[i,])</span>
-<span id="cb23-170"><a href="#cb23-170" aria-hidden="true" tabindex="-1"></a>                        }</span>
-<span id="cb23-171"><a href="#cb23-171" aria-hidden="true" tabindex="-1"></a>                      },</span>
-<span id="cb23-172"><a href="#cb23-172" aria-hidden="true" tabindex="-1"></a>                    <span class="at">update_R2 =</span> <span class="cf">function</span>(<span class="at">response.nodes =</span> <span class="fu">integer</span>(<span class="dv">1</span>), <span class="at">n.response.nodes =</span> <span class="fu">integer</span>(), <span class="at">n.zero.response.nodes =</span> <span class="fu">integer</span>(), <span class="at">lp =</span> <span class="fu">double</span>(<span class="dv">1</span>), <span class="at">t2 =</span> <span class="fu">double</span>(<span class="dv">1</span>), <span class="at">vy =</span> <span class="fu">double</span>(<span class="dv">2</span>), <span class="at">my =</span> <span class="fu">double</span>(<span class="dv">2</span>), <span class="at">wy =</span> <span class="fu">double</span>(<span class="dv">2</span>)){</span>
-<span id="cb23-173"><a href="#cb23-173" aria-hidden="true" tabindex="-1"></a>                      <span class="co"># this function only works if l380-384 are here instead of in "setup" for some reason</span></span>
-<span id="cb23-174"><a href="#cb23-174" aria-hidden="true" tabindex="-1"></a>                      <span class="co"># otherwise it returns NaN..</span></span>
-<span id="cb23-175"><a href="#cb23-175" aria-hidden="true" tabindex="-1"></a>                        vy2 <span class="ot">&lt;-</span> vy</span>
-<span id="cb23-176"><a href="#cb23-176" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>){</span>
-<span id="cb23-177"><a href="#cb23-177" aria-hidden="true" tabindex="-1"></a>                          vy2[vy2[,i]<span class="sc">==</span><span class="dv">0</span>,i]<span class="ot">&lt;-</span><span class="dv">1</span></span>
-<span id="cb23-178"><a href="#cb23-178" aria-hidden="true" tabindex="-1"></a>                        }</span>
-<span id="cb23-179"><a href="#cb23-179" aria-hidden="true" tabindex="-1"></a>                        lwy <span class="ot">&lt;-</span> wy</span>
-<span id="cb23-180"><a href="#cb23-180" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>){</span>
-<span id="cb23-181"><a href="#cb23-181" aria-hidden="true" tabindex="-1"></a>                          lwy[lwy[,i]<span class="sc">==</span><span class="dv">0</span>,i] <span class="ot">&lt;-</span> <span class="dv">1</span></span>
-<span id="cb23-182"><a href="#cb23-182" aria-hidden="true" tabindex="-1"></a>                          lwy[lwy[,i]<span class="sc">&lt;</span><span class="dv">0</span>,i] <span class="ot">&lt;-</span> <span class="dv">1</span></span>
-<span id="cb23-183"><a href="#cb23-183" aria-hidden="true" tabindex="-1"></a>                          lwy[,i] <span class="ot">&lt;-</span> <span class="fu">log</span>(lwy[,i])</span>
-<span id="cb23-184"><a href="#cb23-184" aria-hidden="true" tabindex="-1"></a>                        }</span>
-<span id="cb23-185"><a href="#cb23-185" aria-hidden="true" tabindex="-1"></a>                        lvy <span class="ot">&lt;-</span> vy</span>
-<span id="cb23-186"><a href="#cb23-186" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>){</span>
-<span id="cb23-187"><a href="#cb23-187" aria-hidden="true" tabindex="-1"></a>                          lvy[lvy[,i]<span class="sc">==</span><span class="dv">0</span>,i] <span class="ot">&lt;-</span> <span class="dv">1</span></span>
-<span id="cb23-188"><a href="#cb23-188" aria-hidden="true" tabindex="-1"></a>                          lvy[lvy[,i]<span class="sc">&lt;</span><span class="dv">0</span>,i] <span class="ot">&lt;-</span> <span class="dv">1</span></span>
-<span id="cb23-189"><a href="#cb23-189" aria-hidden="true" tabindex="-1"></a>                          lvy[,i] <span class="ot">&lt;-</span> <span class="fu">log</span>(lvy[,i])</span>
-<span id="cb23-190"><a href="#cb23-190" aria-hidden="true" tabindex="-1"></a>                        }</span>
-<span id="cb23-191"><a href="#cb23-191" aria-hidden="true" tabindex="-1"></a>                        c2 <span class="ot">&lt;-</span> (lwy <span class="sc">-</span> <span class="fl">0.5</span><span class="sc">*</span>lvy)</span>
-<span id="cb23-192"><a href="#cb23-192" aria-hidden="true" tabindex="-1"></a>                        </span>
-<span id="cb23-193"><a href="#cb23-193" aria-hidden="true" tabindex="-1"></a>                        minlogt2minlp <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="sc">-</span><span class="fu">log</span>(t2) <span class="sc">-</span> lp[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>],<span class="at">ncol=</span><span class="dv">10</span>,<span class="at">nrow=</span>n.response.nodes<span class="sc">-</span>n.zero.response.nodes)</span>
-<span id="cb23-194"><a href="#cb23-194" aria-hidden="true" tabindex="-1"></a>                        </span>
-<span id="cb23-195"><a href="#cb23-195" aria-hidden="true" tabindex="-1"></a>                        kill <span class="ot">&lt;-</span> <span class="fu">matrix</span>(vy <span class="sc">&gt;</span> <span class="dv">0</span>, n.response.nodes <span class="sc">-</span> n.zero.response.nodes, <span class="dv">10</span>)</span>
-<span id="cb23-196"><a href="#cb23-196" aria-hidden="true" tabindex="-1"></a>                        xx     <span class="ot">&lt;-</span> minlogt2minlp<span class="sc">*</span>kill</span>
-<span id="cb23-197"><a href="#cb23-197" aria-hidden="true" tabindex="-1"></a>                        </span>
-<span id="cb23-198"><a href="#cb23-198" aria-hidden="true" tabindex="-1"></a>                        rgmx   <span class="ot">&lt;-</span> c2 <span class="sc">-</span> <span class="fl">0.5</span><span class="sc">*</span>(xx <span class="sc">-</span> my)<span class="sc">^</span><span class="dv">2</span><span class="sc">/</span>vy2</span>
-<span id="cb23-199"><a href="#cb23-199" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>){ <span class="co">#ncol r gm</span></span>
-<span id="cb23-200"><a href="#cb23-200" aria-hidden="true" tabindex="-1"></a>                          rgmx[rgmx[,i]<span class="sc">==</span><span class="dv">0</span>,i] <span class="ot">&lt;-</span> <span class="sc">-</span><span class="cn">Inf</span></span>
-<span id="cb23-201"><a href="#cb23-201" aria-hidden="true" tabindex="-1"></a>                        }</span>
-<span id="cb23-202"><a href="#cb23-202" aria-hidden="true" tabindex="-1"></a>                        e2 <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="dv">0</span>,<span class="at">nrow =</span> n.response.nodes<span class="sc">-</span>n.zero.response.nodes, <span class="at">ncol =</span> <span class="dv">10</span>)</span>
-<span id="cb23-203"><a href="#cb23-203" aria-hidden="true" tabindex="-1"></a>                        mx2 <span class="ot">=</span> <span class="fu">numeric</span>(n.response.nodes<span class="sc">-</span>n.zero.response.nodes)</span>
-<span id="cb23-204"><a href="#cb23-204" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>(n.response.nodes<span class="sc">-</span>n.zero.response.nodes)){</span>
-<span id="cb23-205"><a href="#cb23-205" aria-hidden="true" tabindex="-1"></a>                          mx2[i] <span class="ot">=</span> <span class="fu">max</span>(rgmx[i,])</span>
-<span id="cb23-206"><a href="#cb23-206" aria-hidden="true" tabindex="-1"></a>                          <span class="cf">if</span>(mx2[i]<span class="sc">==-</span><span class="cn">Inf</span>)mx2[i]<span class="ot">=</span><span class="dv">0</span></span>
-<span id="cb23-207"><a href="#cb23-207" aria-hidden="true" tabindex="-1"></a>                          e2[i,] <span class="ot">&lt;-</span> <span class="fu">exp</span>(rgmx[i,]<span class="sc">-</span>mx2[i])</span>
-<span id="cb23-208"><a href="#cb23-208" aria-hidden="true" tabindex="-1"></a>                        }</span>
-<span id="cb23-209"><a href="#cb23-209" aria-hidden="true" tabindex="-1"></a>                        rgmodx <span class="ot">&lt;-</span> <span class="fu">numeric</span>(n.response.nodes<span class="sc">-</span>n.zero.response.nodes)</span>
-<span id="cb23-210"><a href="#cb23-210" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>(n.response.nodes<span class="sc">-</span>n.zero.response.nodes)){</span>
-<span id="cb23-211"><a href="#cb23-211" aria-hidden="true" tabindex="-1"></a>                          rgmodx[i] <span class="ot">&lt;-</span> <span class="fu">sum</span>(e2[i,])</span>
-<span id="cb23-212"><a href="#cb23-212" aria-hidden="true" tabindex="-1"></a>                        }</span>
-<span id="cb23-213"><a href="#cb23-213" aria-hidden="true" tabindex="-1"></a>                        e2.new <span class="ot">=</span> <span class="fu">matrix</span>(<span class="dv">0</span>,<span class="at">nrow=</span>n.response.nodes<span class="sc">-</span>n.zero.response.nodes, <span class="at">ncol =</span> <span class="dv">10</span>)</span>
-<span id="cb23-214"><a href="#cb23-214" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>){</span>
-<span id="cb23-215"><a href="#cb23-215" aria-hidden="true" tabindex="-1"></a>                          e2.new[,i] <span class="ot">&lt;-</span> e2[,i]<span class="sc">/</span>rgmodx <span class="co"># for safety might want to check for 0/0 i.e., nan</span></span>
-<span id="cb23-216"><a href="#cb23-216" aria-hidden="true" tabindex="-1"></a>                        }</span>
-<span id="cb23-217"><a href="#cb23-217" aria-hidden="true" tabindex="-1"></a>                        </span>
-<span id="cb23-218"><a href="#cb23-218" aria-hidden="true" tabindex="-1"></a>                        tri.mat <span class="ot">=</span> <span class="fu">matrix</span>(<span class="dv">1</span>, <span class="dv">10</span>, <span class="dv">10</span>)</span>
-<span id="cb23-219"><a href="#cb23-219" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span> (j <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">9</span>) {</span>
-<span id="cb23-220"><a href="#cb23-220" aria-hidden="true" tabindex="-1"></a>                          <span class="cf">for</span> (i <span class="cf">in</span> (j<span class="sc">+</span><span class="dv">1</span>)<span class="sc">:</span><span class="dv">10</span>) {</span>
-<span id="cb23-221"><a href="#cb23-221" aria-hidden="true" tabindex="-1"></a>                            tri.mat[i,j] <span class="ot">=</span> <span class="dv">0</span></span>
-<span id="cb23-222"><a href="#cb23-222" aria-hidden="true" tabindex="-1"></a>                          }</span>
-<span id="cb23-223"><a href="#cb23-223" aria-hidden="true" tabindex="-1"></a>                        }</span>
-<span id="cb23-224"><a href="#cb23-224" aria-hidden="true" tabindex="-1"></a>                        </span>
-<span id="cb23-225"><a href="#cb23-225" aria-hidden="true" tabindex="-1"></a>                        Fx     <span class="ot">&lt;-</span> e2.new<span class="sc">%*%</span>tri.mat</span>
-<span id="cb23-226"><a href="#cb23-226" aria-hidden="true" tabindex="-1"></a>                        </span>
-<span id="cb23-227"><a href="#cb23-227" aria-hidden="true" tabindex="-1"></a>                        <span class="co"># determination of random indicators R2</span></span>
-<span id="cb23-228"><a href="#cb23-228" aria-hidden="true" tabindex="-1"></a>                        ux <span class="ot">&lt;-</span> <span class="fu">runif</span>(n.response.nodes <span class="sc">-</span> n.zero.response.nodes, <span class="dv">0</span>, <span class="dv">1</span>)</span>
-<span id="cb23-229"><a href="#cb23-229" aria-hidden="true" tabindex="-1"></a>                        R2.temp <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="dv">0</span>, <span class="at">ncol =</span> <span class="dv">10</span>, <span class="at">nrow =</span> n.response.nodes <span class="sc">-</span> n.zero.response.nodes)</span>
-<span id="cb23-230"><a href="#cb23-230" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>){</span>
-<span id="cb23-231"><a href="#cb23-231" aria-hidden="true" tabindex="-1"></a>                          R2.temp[,i] <span class="ot">&lt;-</span> ux<span class="sc">&lt;</span>Fx[,i]</span>
-<span id="cb23-232"><a href="#cb23-232" aria-hidden="true" tabindex="-1"></a>                        }</span>
-<span id="cb23-233"><a href="#cb23-233" aria-hidden="true" tabindex="-1"></a>                        </span>
-<span id="cb23-234"><a href="#cb23-234" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>(n.response.nodes<span class="sc">-</span>n.zero.response.nodes)){</span>
-<span id="cb23-235"><a href="#cb23-235" aria-hidden="true" tabindex="-1"></a>                          R2[i] <span class="ot">&lt;&lt;-</span> <span class="dv">11</span><span class="sc">-</span><span class="fu">sum</span>(R2.temp[i,])</span>
-<span id="cb23-236"><a href="#cb23-236" aria-hidden="true" tabindex="-1"></a>                        }</span>
-<span id="cb23-237"><a href="#cb23-237" aria-hidden="true" tabindex="-1"></a>                      },</span>
-<span id="cb23-238"><a href="#cb23-238" aria-hidden="true" tabindex="-1"></a>                 <span class="at">reset =</span> <span class="cf">function</span> () {}</span>
-<span id="cb23-239"><a href="#cb23-239" aria-hidden="true" tabindex="-1"></a>                    )</span>
-<span id="cb23-240"><a href="#cb23-240" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>X <span class="ot">&lt;-</span> <span class="fu">cbind</span>(<span class="dv">1</span>,x)</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a><span class="co"># define some constants</span></span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>    <span class="co"># number of target parameters</span></span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>    response.nodes <span class="ot">&lt;-</span> y</span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>    n.param.nodes <span class="ot">&lt;-</span> <span class="fu">dim</span>(X)[<span class="dv">2</span>]</span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>    n.response.nodes <span class="ot">&lt;-</span> <span class="fu">dim</span>(X)[<span class="dv">1</span>]</span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>    n.zero.response.nodes <span class="ot">&lt;-</span> <span class="fu">sum</span>(y<span class="sc">==</span><span class="dv">0</span>)</span>
+<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a>    <span class="co"># prior parameters, should get these based on "target"</span></span>
+<span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a>    bPriorMean <span class="ot">=</span> <span class="fu">numeric</span>(n.param.nodes) <span class="co"># still replace if different</span></span>
+<span id="cb23-10"><a href="#cb23-10" aria-hidden="true" tabindex="-1"></a>    bPriorCov <span class="ot">=</span> <span class="fu">diag</span>(n.param.nodes) <span class="co"># still replace if different</span></span>
+<span id="cb23-11"><a href="#cb23-11" aria-hidden="true" tabindex="-1"></a>    <span class="co"># mixture components</span></span>
+<span id="cb23-12"><a href="#cb23-12" aria-hidden="true" tabindex="-1"></a>    <span class="co"># v: variances (s), m: means (m), w: weights</span></span>
+<span id="cb23-13"><a href="#cb23-13" aria-hidden="true" tabindex="-1"></a>    mcomp <span class="ot">&lt;-</span> pogit<span class="sc">:::</span><span class="fu">mixcomp_poisson</span>()</span>
+<span id="cb23-14"><a href="#cb23-14" aria-hidden="true" tabindex="-1"></a>    mcompm <span class="ot">&lt;-</span> mcomp<span class="sc">$</span>m</span>
+<span id="cb23-15"><a href="#cb23-15" aria-hidden="true" tabindex="-1"></a>    mcompv <span class="ot">&lt;-</span> mcomp<span class="sc">$</span>v</span>
+<span id="cb23-16"><a href="#cb23-16" aria-hidden="true" tabindex="-1"></a>    mcompw <span class="ot">&lt;-</span> mcomp<span class="sc">$</span>w</span>
+<span id="cb23-17"><a href="#cb23-17" aria-hidden="true" tabindex="-1"></a>    <span class="co"># initialize R, indicator variables</span></span>
+<span id="cb23-18"><a href="#cb23-18" aria-hidden="true" tabindex="-1"></a>    R1 <span class="ot">&lt;-</span> <span class="fu">rep</span>(<span class="cn">NA_real_</span>, n.response.nodes)</span>
+<span id="cb23-19"><a href="#cb23-19" aria-hidden="true" tabindex="-1"></a>    R2 <span class="ot">&lt;-</span> <span class="fu">rep</span>(<span class="cn">NA_real_</span>, n.response.nodes<span class="sc">-</span>n.zero.response.nodes)</span>
+<span id="cb23-20"><a href="#cb23-20" aria-hidden="true" tabindex="-1"></a>    tau <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="cn">NA_real_</span>, n.response.nodes,<span class="at">ncol=</span><span class="dv">2</span>)</span>
+<span id="cb23-21"><a href="#cb23-21" aria-hidden="true" tabindex="-1"></a>    <span class="co"># start by getting mixture components, this is "get_mixcomp" in pogit</span></span>
+<span id="cb23-22"><a href="#cb23-22" aria-hidden="true" tabindex="-1"></a>    <span class="co"># m: means for mixture components, v: scales, w: weights</span></span>
+<span id="cb23-23"><a href="#cb23-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span>(<span class="fu">sum</span>(response.nodes<span class="sc">&lt;</span><span class="fl">3e4</span>)<span class="sc">==</span>n.response.nodes){</span>
+<span id="cb23-24"><a href="#cb23-24" aria-hidden="true" tabindex="-1"></a>      my <span class="ot">=</span> mcomp<span class="sc">$</span>m[response.nodes[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>],]</span>
+<span id="cb23-25"><a href="#cb23-25" aria-hidden="true" tabindex="-1"></a>      vy <span class="ot">=</span> mcomp<span class="sc">$</span>v[response.nodes[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>],]</span>
+<span id="cb23-26"><a href="#cb23-26" aria-hidden="true" tabindex="-1"></a>      wy <span class="ot">=</span> mcomp<span class="sc">$</span>w[response.nodes[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>],]</span>
+<span id="cb23-27"><a href="#cb23-27" aria-hidden="true" tabindex="-1"></a>    }<span class="cf">else</span>{</span>
+<span id="cb23-28"><a href="#cb23-28" aria-hidden="true" tabindex="-1"></a>      wy <span class="ot">=</span> vy <span class="ot">=</span> my <span class="ot">=</span> <span class="fu">matrix</span>(<span class="dv">0</span>, <span class="at">nrow =</span> n.response.nodes <span class="sc">-</span> n.zero.response.nodes, <span class="at">ncol =</span> <span class="dv">10</span>)</span>
+<span id="cb23-29"><a href="#cb23-29" aria-hidden="true" tabindex="-1"></a>      my[response.nodes[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>] <span class="sc">&lt;=</span> <span class="fl">3e4</span>,<span class="dv">1</span><span class="sc">:</span><span class="fu">dim</span>(mcomp<span class="sc">$</span>m)[<span class="dv">2</span>]] <span class="ot">=</span> mcomp<span class="sc">$</span>m[response.nodes[(response.nodes<span class="sc">&gt;</span><span class="dv">0</span>) <span class="sc">&amp;</span> (response.nodes <span class="sc">&lt;=</span> <span class="fl">3e4</span>)],]</span>
+<span id="cb23-30"><a href="#cb23-30" aria-hidden="true" tabindex="-1"></a>      vy[response.nodes[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>] <span class="sc">&lt;=</span> <span class="fl">3e4</span>,<span class="dv">1</span><span class="sc">:</span><span class="fu">dim</span>(mcomp<span class="sc">$</span>v)[<span class="dv">2</span>]] <span class="ot">=</span> mcomp<span class="sc">$</span>v[response.nodes[(response.nodes<span class="sc">&gt;</span><span class="dv">0</span>) <span class="sc">&amp;</span> (response.nodes <span class="sc">&lt;=</span> <span class="fl">3e4</span>)],]</span>
+<span id="cb23-31"><a href="#cb23-31" aria-hidden="true" tabindex="-1"></a>      wy[response.nodes[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>] <span class="sc">&lt;=</span> <span class="fl">3e4</span>,<span class="dv">1</span><span class="sc">:</span><span class="fu">dim</span>(mcomp<span class="sc">$</span>w)[<span class="dv">2</span>]] <span class="ot">=</span> mcomp<span class="sc">$</span>w[response.nodes[(response.nodes<span class="sc">&gt;</span><span class="dv">0</span>) <span class="sc">&amp;</span> (response.nodes <span class="sc">&lt;=</span> <span class="fl">3e4</span>)],]</span>
+<span id="cb23-32"><a href="#cb23-32" aria-hidden="true" tabindex="-1"></a>      <span class="co"># this comes from "compute_mixture.R"</span></span>
+<span id="cb23-33"><a href="#cb23-33" aria-hidden="true" tabindex="-1"></a>      <span class="cf">for</span>(i <span class="cf">in</span> response.nodes[response.nodes<span class="sc">&gt;</span><span class="fl">3e4</span>]){</span>
+<span id="cb23-34"><a href="#cb23-34" aria-hidden="true" tabindex="-1"></a>        my[response.nodes[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>]<span class="sc">==</span>i,<span class="dv">1</span>] <span class="ot">&lt;-</span> <span class="sc">-</span><span class="fu">digamma</span>(i)</span>
+<span id="cb23-35"><a href="#cb23-35" aria-hidden="true" tabindex="-1"></a>        vy[response.nodes[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>]<span class="sc">==</span>i,<span class="dv">1</span>] <span class="ot">&lt;-</span> <span class="fu">trigamma</span>(i)</span>
+<span id="cb23-36"><a href="#cb23-36" aria-hidden="true" tabindex="-1"></a>        wy[response.nodes[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>]<span class="sc">==</span>i,<span class="dv">1</span>] <span class="ot">&lt;-</span> <span class="dv">1</span> </span>
+<span id="cb23-37"><a href="#cb23-37" aria-hidden="true" tabindex="-1"></a>      }</span>
+<span id="cb23-38"><a href="#cb23-38" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb23-39"><a href="#cb23-39" aria-hidden="true" tabindex="-1"></a>    vy[<span class="fu">is.na</span>(vy)] <span class="ot">&lt;-</span> <span class="dv">0</span></span>
+<span id="cb23-40"><a href="#cb23-40" aria-hidden="true" tabindex="-1"></a>    my[<span class="fu">is.na</span>(my)] <span class="ot">&lt;-</span> <span class="dv">0</span></span>
+<span id="cb23-41"><a href="#cb23-41" aria-hidden="true" tabindex="-1"></a>    wy[<span class="fu">is.na</span>(wy)] <span class="ot">&lt;-</span> <span class="dv">0</span></span>
+<span id="cb23-42"><a href="#cb23-42" aria-hidden="true" tabindex="-1"></a>    <span class="co"># for use in step 3</span></span>
+<span id="cb23-43"><a href="#cb23-43" aria-hidden="true" tabindex="-1"></a>    c1 <span class="ot">&lt;-</span> <span class="fu">t</span>(<span class="fu">matrix</span>(<span class="fu">log</span>(mcompw[<span class="dv">1</span>, ]) <span class="sc">-</span> <span class="fl">0.5</span><span class="sc">*</span><span class="fu">log</span>(mcompv[<span class="dv">1</span>, ]), <span class="at">nrow =</span> <span class="dv">10</span>, <span class="at">ncol =</span> n.response.nodes)) <span class="co"># not sure what this is yet</span></span>
+<span id="cb23-44"><a href="#cb23-44" aria-hidden="true" tabindex="-1"></a>n.iter <span class="ot">=</span> <span class="fl">1e3</span></span>
+<span id="cb23-45"><a href="#cb23-45" aria-hidden="true" tabindex="-1"></a>samples <span class="ot">&lt;-</span> <span class="cn">NULL</span></span>
+<span id="cb23-46"><a href="#cb23-46" aria-hidden="true" tabindex="-1"></a>beta <span class="ot">&lt;-</span> <span class="fu">rnorm</span>(<span class="dv">2</span>) <span class="co"># initialize</span></span>
+<span id="cb23-47"><a href="#cb23-47" aria-hidden="true" tabindex="-1"></a>lp <span class="ot">=</span> X<span class="sc">%*%</span>beta <span class="co"># create linear predictor</span></span>
+<span id="cb23-48"><a href="#cb23-48" aria-hidden="true" tabindex="-1"></a>lambda <span class="ot">=</span> <span class="fu">exp</span>(lp) <span class="co"># distributional parameter</span></span>
+<span id="cb23-49"><a href="#cb23-49" aria-hidden="true" tabindex="-1"></a>tau <span class="ot">&lt;-</span> <span class="fu">update_tau</span>(response.nodes, N, n.zero.response.nodes, lambda) <span class="co"># intitialize tau</span></span>
+<span id="cb23-50"><a href="#cb23-50" aria-hidden="true" tabindex="-1"></a>R1 <span class="ot">&lt;-</span> <span class="fu">update_R1</span>(N, lp, tau[,<span class="dv">1</span>], mcomp<span class="sc">$</span>m, <span class="at">mcompv =</span> mcomp<span class="sc">$</span>v, c1)<span class="co"># initialize R1</span></span>
+<span id="cb23-51"><a href="#cb23-51" aria-hidden="true" tabindex="-1"></a>R2 <span class="ot">&lt;-</span> <span class="fu">update_R2</span>(response.nodes, N, n.zero.response.nodes, lp, tau[y<span class="sc">&gt;</span><span class="dv">0</span>,<span class="dv">2</span>], vy, my, wy)  <span class="co"># initialize R2</span></span>
+<span id="cb23-52"><a href="#cb23-52" aria-hidden="true" tabindex="-1"></a>pb <span class="ot">=</span> <span class="fu">txtProgressBar</span>(<span class="at">min =</span> <span class="dv">0</span>, <span class="at">max =</span> n.iter, <span class="at">initial =</span> <span class="dv">0</span>) <span class="co"># progress bar. because, why not!</span></span>
+<span id="cb23-53"><a href="#cb23-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-54"><a href="#cb23-54" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>n.iter){</span>
+<span id="cb23-55"><a href="#cb23-55" aria-hidden="true" tabindex="-1"></a><span class="co"># calculate posterior moments</span></span>
+<span id="cb23-56"><a href="#cb23-56" aria-hidden="true" tabindex="-1"></a>  <span class="fu">calc_post_mom</span>(X, N, n.zero.response.nodes, y, R1, R2, tau, mcomp<span class="sc">$</span>v, mcomp<span class="sc">$</span>m, my, vy)</span>
+<span id="cb23-57"><a href="#cb23-57" aria-hidden="true" tabindex="-1"></a>  <span class="co"># simulate from posterior</span></span>
+<span id="cb23-58"><a href="#cb23-58" aria-hidden="true" tabindex="-1"></a>  beta <span class="ot">&lt;-</span> <span class="fu">rmnorm_chol</span>(<span class="dv">1</span>, <span class="at">mean =</span> <span class="fu">c</span>(postMean), <span class="at">cholesky =</span> <span class="fu">chol</span>(postCov), <span class="at">prec_param =</span> <span class="dv">0</span>)</span>
+<span id="cb23-59"><a href="#cb23-59" aria-hidden="true" tabindex="-1"></a>  <span class="co"># store sample</span></span>
+<span id="cb23-60"><a href="#cb23-60" aria-hidden="true" tabindex="-1"></a>  samples <span class="ot">&lt;-</span> <span class="fu">rbind</span>(samples, beta)</span>
+<span id="cb23-61"><a href="#cb23-61" aria-hidden="true" tabindex="-1"></a>  <span class="co"># update lp, lambda</span></span>
+<span id="cb23-62"><a href="#cb23-62" aria-hidden="true" tabindex="-1"></a>  lp <span class="ot">=</span> X<span class="sc">%*%</span>beta <span class="co"># linear predictor</span></span>
+<span id="cb23-63"><a href="#cb23-63" aria-hidden="true" tabindex="-1"></a>  lambda <span class="ot">=</span> <span class="fu">exp</span>(lp) <span class="co"># distributional parameter</span></span>
+<span id="cb23-64"><a href="#cb23-64" aria-hidden="true" tabindex="-1"></a>  tau <span class="ot">&lt;-</span> <span class="fu">update_tau</span>(response.nodes, N, n.zero.response.nodes, lambda) <span class="co"># update tau</span></span>
+<span id="cb23-65"><a href="#cb23-65" aria-hidden="true" tabindex="-1"></a>  R1 <span class="ot">&lt;-</span> <span class="fu">update_R1</span>(N, lp, tau[,<span class="dv">1</span>], mcomp<span class="sc">$</span>m, <span class="at">mcompv =</span> mcomp<span class="sc">$</span>v, c1)<span class="co"># update R1</span></span>
+<span id="cb23-66"><a href="#cb23-66" aria-hidden="true" tabindex="-1"></a>  R2 <span class="ot">&lt;-</span> <span class="fu">update_R2</span>(response.nodes, N, n.zero.response.nodes, lp, tau[y<span class="sc">&gt;</span><span class="dv">0</span>,<span class="dv">2</span>], vy, my, wy)  <span class="co"># update R2</span></span>
+<span id="cb23-67"><a href="#cb23-67" aria-hidden="true" tabindex="-1"></a>  <span class="fu">setTxtProgressBar</span>(pb,i)</span>
+<span id="cb23-68"><a href="#cb23-68" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>================================================================================</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(coda<span class="sc">::</span><span class="fu">as.mcmc</span>(samples)) <span class="co"># correct!</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Iterations = 1:1000
+Thinning interval = 1 
+Number of chains = 1 
+Sample size per chain = 1000 
+
+1. Empirical mean and standard deviation for each variable,
+   plus standard error of the mean:
+
+       Mean      SD Naive SE Time-series SE
+[1,] 0.9771 0.11082 0.003504       0.014222
+[2,] 1.0118 0.05234 0.001655       0.007094
+
+2. Quantiles for each variable:
+
+       2.5%    25%    50%   75% 97.5%
+var1 0.9030 0.9751 0.9917 1.006 1.028
+var2 0.9806 0.9959 1.0053 1.015 1.061</code></pre>
+</div>
+</div>
+</section>
+<section id="putting-it-in-nimble" class="level3">
+<h3 class="anchored" data-anchor-id="putting-it-in-nimble">Putting it in NIMBLE</h3>
+<p>Nimble runs things in C++ so it will be faster, and we can combine it with other samplers and fun tricks. So, here we go:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="co"># sampler for Poisson responses based on Fruhwirth-Schnatter and Wagner 2006 and Fruhwirth-Schnatter et al. 2009</span></span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a><span class="co"># as implemented in the JAGS and the pogit packages</span></span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>sampler_glm_pois <span class="ot">&lt;-</span> <span class="fu">nimbleFunction</span>(</span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">contains =</span> sampler_BASE,</span>
+<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">name =</span> <span class="st">'sampler_glm_pois'</span>,</span>
+<span id="cb27-7"><a href="#cb27-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">setup =</span> <span class="cf">function</span>(model, mvSaved, target, control) {</span>
+<span id="cb27-8"><a href="#cb27-8" aria-hidden="true" tabindex="-1"></a>    <span class="co"># get response data nodes</span></span>
+<span id="cb27-9"><a href="#cb27-9" aria-hidden="true" tabindex="-1"></a>    response.nodes.names <span class="ot">&lt;-</span> <span class="fu">names</span>(<span class="fu">which</span>(model<span class="sc">$</span><span class="fu">isStoch</span>(<span class="fu">names</span>(model<span class="sc">$</span>origData)))) <span class="co"># names of response nodes</span></span>
+<span id="cb27-10"><a href="#cb27-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span>(<span class="sc">!</span><span class="fu">all</span>(model<span class="sc">$</span><span class="fu">getDistribution</span>(response.nodes.names)<span class="sc">==</span><span class="st">"dpois"</span>))<span class="fu">stop</span>(<span class="st">"This sampler is designed only for Poisson responses."</span>)</span>
+<span id="cb27-11"><a href="#cb27-11" aria-hidden="true" tabindex="-1"></a>    response.name  <span class="ot">=</span> <span class="fu">unique</span>(<span class="fu">gsub</span>(<span class="st">"</span><span class="sc">\\</span><span class="st">[.*"</span>,<span class="st">""</span>,response.nodes.names))</span>
+<span id="cb27-12"><a href="#cb27-12" aria-hidden="true" tabindex="-1"></a>    response.nodes <span class="ot">&lt;-</span> <span class="fu">values</span>(model, response.nodes.names) <span class="co"># response data</span></span>
+<span id="cb27-13"><a href="#cb27-13" aria-hidden="true" tabindex="-1"></a>    n.response.nodes <span class="ot">&lt;-</span> <span class="fu">length</span>(response.nodes) <span class="co"># number of observations</span></span>
+<span id="cb27-14"><a href="#cb27-14" aria-hidden="true" tabindex="-1"></a>    n.zero.response.nodes <span class="ot">=</span> <span class="fu">sum</span>(response.nodes<span class="sc">==</span><span class="dv">0</span>) <span class="co"># number of zero observations</span></span>
+<span id="cb27-15"><a href="#cb27-15" aria-hidden="true" tabindex="-1"></a>    <span class="do">## get distribution parameter names</span></span>
+<span id="cb27-16"><a href="#cb27-16" aria-hidden="true" tabindex="-1"></a>    dist.par.names <span class="ot">=</span> model<span class="sc">$</span><span class="fu">getParents</span>(response.nodes.names,<span class="at">determOnly =</span> F, <span class="at">immediateOnly =</span> T)</span>
+<span id="cb27-17"><a href="#cb27-17" aria-hidden="true" tabindex="-1"></a>    distpar.name  <span class="ot">=</span> <span class="fu">unique</span>(<span class="fu">gsub</span>(<span class="st">"</span><span class="sc">\\</span><span class="st">[.*"</span>,<span class="st">""</span>,dist.par.names))</span>
+<span id="cb27-18"><a href="#cb27-18" aria-hidden="true" tabindex="-1"></a>    lp.nodes.names <span class="ot">=</span> model<span class="sc">$</span><span class="fu">getParents</span>(dist.par.names,<span class="at">immediateOnly =</span> T, <span class="at">determOnly =</span> T,<span class="at">includeData =</span> F)</span>
+<span id="cb27-19"><a href="#cb27-19" aria-hidden="true" tabindex="-1"></a>    lp.name  <span class="ot">=</span> <span class="fu">unique</span>(<span class="fu">gsub</span>(<span class="st">"</span><span class="sc">\\</span><span class="st">[.*"</span>,<span class="st">""</span>,lp.nodes.names))</span>
+<span id="cb27-20"><a href="#cb27-20" aria-hidden="true" tabindex="-1"></a>    <span class="co"># get corresponding "data" nodes to target, should do this automatically based o "target"</span></span>
+<span id="cb27-21"><a href="#cb27-21" aria-hidden="true" tabindex="-1"></a>    X <span class="ot">&lt;-</span> model<span class="sc">$</span>X</span>
+<span id="cb27-22"><a href="#cb27-22" aria-hidden="true" tabindex="-1"></a>    <span class="co"># number of target parameters</span></span>
+<span id="cb27-23"><a href="#cb27-23" aria-hidden="true" tabindex="-1"></a>    n.param.nodes <span class="ot">&lt;-</span> <span class="fu">dim</span>(X)[<span class="dv">2</span>]</span>
+<span id="cb27-24"><a href="#cb27-24" aria-hidden="true" tabindex="-1"></a>    <span class="co"># prior parameters, should get these based on "target"</span></span>
+<span id="cb27-25"><a href="#cb27-25" aria-hidden="true" tabindex="-1"></a>    bPriorMean <span class="ot">=</span> <span class="fu">numeric</span>(n.param.nodes) <span class="co"># still replace if different</span></span>
+<span id="cb27-26"><a href="#cb27-26" aria-hidden="true" tabindex="-1"></a>    bPriorCov <span class="ot">=</span> <span class="fu">diag</span>(n.param.nodes) <span class="co"># still replace if different</span></span>
+<span id="cb27-27"><a href="#cb27-27" aria-hidden="true" tabindex="-1"></a>    <span class="co"># mixture components</span></span>
+<span id="cb27-28"><a href="#cb27-28" aria-hidden="true" tabindex="-1"></a>    <span class="co"># v: variances (s), m: means (m), w: weights</span></span>
+<span id="cb27-29"><a href="#cb27-29" aria-hidden="true" tabindex="-1"></a>    mcomp <span class="ot">&lt;-</span> pogit<span class="sc">:::</span><span class="fu">mixcomp_poisson</span>()</span>
+<span id="cb27-30"><a href="#cb27-30" aria-hidden="true" tabindex="-1"></a>    mcompm <span class="ot">&lt;-</span> mcomp<span class="sc">$</span>m</span>
+<span id="cb27-31"><a href="#cb27-31" aria-hidden="true" tabindex="-1"></a>    mcompv <span class="ot">&lt;-</span> mcomp<span class="sc">$</span>v</span>
+<span id="cb27-32"><a href="#cb27-32" aria-hidden="true" tabindex="-1"></a>    mcompw <span class="ot">&lt;-</span> mcomp<span class="sc">$</span>w</span>
+<span id="cb27-33"><a href="#cb27-33" aria-hidden="true" tabindex="-1"></a>    <span class="co"># initialize R, indicator variables</span></span>
+<span id="cb27-34"><a href="#cb27-34" aria-hidden="true" tabindex="-1"></a>    R1 <span class="ot">&lt;-</span> <span class="fu">rep</span>(<span class="cn">NA_real_</span>, n.response.nodes)</span>
+<span id="cb27-35"><a href="#cb27-35" aria-hidden="true" tabindex="-1"></a>    R2 <span class="ot">&lt;-</span> <span class="fu">rep</span>(<span class="cn">NA_real_</span>, n.response.nodes<span class="sc">-</span>n.zero.response.nodes)</span>
+<span id="cb27-36"><a href="#cb27-36" aria-hidden="true" tabindex="-1"></a>    tau <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="cn">NA_real_</span>, n.response.nodes,<span class="at">ncol=</span><span class="dv">2</span>)</span>
+<span id="cb27-37"><a href="#cb27-37" aria-hidden="true" tabindex="-1"></a>    <span class="co"># start by getting mixture components, this is "get_mixcomp" in pogit</span></span>
+<span id="cb27-38"><a href="#cb27-38" aria-hidden="true" tabindex="-1"></a>    <span class="co"># m: means for mixture components, v: scales, w: weights</span></span>
+<span id="cb27-39"><a href="#cb27-39" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span>(<span class="fu">sum</span>(response.nodes<span class="sc">&lt;</span><span class="fl">3e4</span>)<span class="sc">==</span>n.response.nodes){</span>
+<span id="cb27-40"><a href="#cb27-40" aria-hidden="true" tabindex="-1"></a>      my <span class="ot">=</span> mcomp<span class="sc">$</span>m[response.nodes[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>],]</span>
+<span id="cb27-41"><a href="#cb27-41" aria-hidden="true" tabindex="-1"></a>      vy <span class="ot">=</span> mcomp<span class="sc">$</span>v[response.nodes[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>],]</span>
+<span id="cb27-42"><a href="#cb27-42" aria-hidden="true" tabindex="-1"></a>      wy <span class="ot">=</span> mcomp<span class="sc">$</span>w[response.nodes[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>],]</span>
+<span id="cb27-43"><a href="#cb27-43" aria-hidden="true" tabindex="-1"></a>    }<span class="cf">else</span>{</span>
+<span id="cb27-44"><a href="#cb27-44" aria-hidden="true" tabindex="-1"></a>      wy <span class="ot">=</span> vy <span class="ot">=</span> my <span class="ot">=</span> <span class="fu">matrix</span>(<span class="dv">0</span>, <span class="at">nrow =</span> n.response.nodes <span class="sc">-</span> n.zero.response.nodes, <span class="at">ncol =</span> <span class="dv">10</span>)</span>
+<span id="cb27-45"><a href="#cb27-45" aria-hidden="true" tabindex="-1"></a>      my[response.nodes[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>] <span class="sc">&lt;=</span> <span class="fl">3e4</span>,<span class="dv">1</span><span class="sc">:</span><span class="fu">dim</span>(mcomp<span class="sc">$</span>m)[<span class="dv">2</span>]] <span class="ot">=</span> mcomp<span class="sc">$</span>m[response.nodes[(response.nodes<span class="sc">&gt;</span><span class="dv">0</span>) <span class="sc">&amp;</span> (response.nodes <span class="sc">&lt;=</span> <span class="fl">3e4</span>)],]</span>
+<span id="cb27-46"><a href="#cb27-46" aria-hidden="true" tabindex="-1"></a>      vy[response.nodes[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>] <span class="sc">&lt;=</span> <span class="fl">3e4</span>,<span class="dv">1</span><span class="sc">:</span><span class="fu">dim</span>(mcomp<span class="sc">$</span>v)[<span class="dv">2</span>]] <span class="ot">=</span> mcomp<span class="sc">$</span>v[response.nodes[(response.nodes<span class="sc">&gt;</span><span class="dv">0</span>) <span class="sc">&amp;</span> (response.nodes <span class="sc">&lt;=</span> <span class="fl">3e4</span>)],]</span>
+<span id="cb27-47"><a href="#cb27-47" aria-hidden="true" tabindex="-1"></a>      wy[response.nodes[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>] <span class="sc">&lt;=</span> <span class="fl">3e4</span>,<span class="dv">1</span><span class="sc">:</span><span class="fu">dim</span>(mcomp<span class="sc">$</span>w)[<span class="dv">2</span>]] <span class="ot">=</span> mcomp<span class="sc">$</span>w[response.nodes[(response.nodes<span class="sc">&gt;</span><span class="dv">0</span>) <span class="sc">&amp;</span> (response.nodes <span class="sc">&lt;=</span> <span class="fl">3e4</span>)],]</span>
+<span id="cb27-48"><a href="#cb27-48" aria-hidden="true" tabindex="-1"></a>      <span class="co"># this comes from "compute_mixture.R"</span></span>
+<span id="cb27-49"><a href="#cb27-49" aria-hidden="true" tabindex="-1"></a>      <span class="cf">for</span>(i <span class="cf">in</span> response.nodes[response.nodes<span class="sc">&gt;</span><span class="fl">3e4</span>]){</span>
+<span id="cb27-50"><a href="#cb27-50" aria-hidden="true" tabindex="-1"></a>        my[response.nodes[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>]<span class="sc">==</span>i,<span class="dv">1</span>] <span class="ot">&lt;-</span> <span class="sc">-</span><span class="fu">digamma</span>(i)</span>
+<span id="cb27-51"><a href="#cb27-51" aria-hidden="true" tabindex="-1"></a>        vy[response.nodes[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>]<span class="sc">==</span>i,<span class="dv">1</span>] <span class="ot">&lt;-</span> <span class="fu">trigamma</span>(i)</span>
+<span id="cb27-52"><a href="#cb27-52" aria-hidden="true" tabindex="-1"></a>        wy[response.nodes[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>]<span class="sc">==</span>i,<span class="dv">1</span>] <span class="ot">&lt;-</span> <span class="dv">1</span> </span>
+<span id="cb27-53"><a href="#cb27-53" aria-hidden="true" tabindex="-1"></a>      }</span>
+<span id="cb27-54"><a href="#cb27-54" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb27-55"><a href="#cb27-55" aria-hidden="true" tabindex="-1"></a>    vy[<span class="fu">is.na</span>(vy)] <span class="ot">&lt;-</span> <span class="dv">0</span></span>
+<span id="cb27-56"><a href="#cb27-56" aria-hidden="true" tabindex="-1"></a>    my[<span class="fu">is.na</span>(my)] <span class="ot">&lt;-</span> <span class="dv">0</span></span>
+<span id="cb27-57"><a href="#cb27-57" aria-hidden="true" tabindex="-1"></a>    wy[<span class="fu">is.na</span>(wy)] <span class="ot">&lt;-</span> <span class="dv">0</span></span>
+<span id="cb27-58"><a href="#cb27-58" aria-hidden="true" tabindex="-1"></a>    <span class="co"># for use in step 3</span></span>
+<span id="cb27-59"><a href="#cb27-59" aria-hidden="true" tabindex="-1"></a>    c1 <span class="ot">&lt;-</span> <span class="fu">t</span>(<span class="fu">matrix</span>(<span class="fu">log</span>(mcompw[<span class="dv">1</span>, ]) <span class="sc">-</span> <span class="fl">0.5</span><span class="sc">*</span><span class="fu">log</span>(mcompv[<span class="dv">1</span>, ]), <span class="at">nrow =</span> <span class="dv">10</span>, <span class="at">ncol =</span> n.response.nodes)) <span class="co"># not sure what this is yet</span></span>
+<span id="cb27-60"><a href="#cb27-60" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb27-61"><a href="#cb27-61" aria-hidden="true" tabindex="-1"></a>    calcNodes <span class="ot">&lt;-</span> model<span class="sc">$</span><span class="fu">getDependencies</span>(target)</span>
+<span id="cb27-62"><a href="#cb27-62" aria-hidden="true" tabindex="-1"></a>    model<span class="sc">$</span><span class="fu">simulate</span>()</span>
+<span id="cb27-63"><a href="#cb27-63" aria-hidden="true" tabindex="-1"></a>    model<span class="sc">$</span><span class="fu">calculate</span>(calcNodes)</span>
+<span id="cb27-64"><a href="#cb27-64" aria-hidden="true" tabindex="-1"></a>    targetAsScalar <span class="ot">&lt;-</span> model<span class="sc">$</span><span class="fu">expandNodeNames</span>(target, <span class="at">returnScalarComponents =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb27-65"><a href="#cb27-65" aria-hidden="true" tabindex="-1"></a>  },</span>
+<span id="cb27-66"><a href="#cb27-66" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb27-67"><a href="#cb27-67" aria-hidden="true" tabindex="-1"></a>  <span class="at">run =</span> <span class="cf">function</span>() {</span>
+<span id="cb27-68"><a href="#cb27-68" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 1. simulate parameters given R, tau</span></span>
+<span id="cb27-69"><a href="#cb27-69" aria-hidden="true" tabindex="-1"></a>    <span class="co"># this part is covered in "select_poisson.R"</span></span>
+<span id="cb27-70"><a href="#cb27-70" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span>(<span class="sc">!</span><span class="fu">any_na</span>(R1)){ <span class="co"># I don't update parameters on the first iteration as to generate sensible "warm" start for R1,R2,t1,t2</span></span>
+<span id="cb27-71"><a href="#cb27-71" aria-hidden="true" tabindex="-1"></a>    <span class="co"># first mixture component means</span></span>
+<span id="cb27-72"><a href="#cb27-72" aria-hidden="true" tabindex="-1"></a>    m1 <span class="ot">&lt;-</span> mcompm[<span class="dv">1</span>,R1]</span>
+<span id="cb27-73"><a href="#cb27-73" aria-hidden="true" tabindex="-1"></a>    m2 <span class="ot">&lt;-</span> <span class="fu">numeric</span>(n.response.nodes<span class="sc">-</span>n.zero.response.nodes)</span>
+<span id="cb27-74"><a href="#cb27-74" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>(n.response.nodes<span class="sc">-</span>n.zero.response.nodes)){</span>
+<span id="cb27-75"><a href="#cb27-75" aria-hidden="true" tabindex="-1"></a>      m2[i] <span class="ot">&lt;-</span> my[i,R2[i]]</span>
+<span id="cb27-76"><a href="#cb27-76" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb27-77"><a href="#cb27-77" aria-hidden="true" tabindex="-1"></a>    <span class="co"># second: mixture component variances</span></span>
+<span id="cb27-78"><a href="#cb27-78" aria-hidden="true" tabindex="-1"></a>    v1 <span class="ot">&lt;-</span> mcompv[<span class="dv">1</span>,R1]</span>
+<span id="cb27-79"><a href="#cb27-79" aria-hidden="true" tabindex="-1"></a>    v2 <span class="ot">&lt;-</span> <span class="fu">numeric</span>(n.response.nodes<span class="sc">-</span>n.zero.response.nodes)</span>
+<span id="cb27-80"><a href="#cb27-80" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>(n.response.nodes<span class="sc">-</span>n.zero.response.nodes)){</span>
+<span id="cb27-81"><a href="#cb27-81" aria-hidden="true" tabindex="-1"></a>      v2[i] <span class="ot">&lt;-</span> vy[i,R2[i]]</span>
+<span id="cb27-82"><a href="#cb27-82" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb27-83"><a href="#cb27-83" aria-hidden="true" tabindex="-1"></a>    invSigS <span class="ot">=</span> <span class="fu">numeric</span>(n.response.nodes)</span>
+<span id="cb27-84"><a href="#cb27-84" aria-hidden="true" tabindex="-1"></a>    ys1 <span class="ot">=</span> (<span class="sc">-</span><span class="fu">log</span>(tau[,<span class="dv">1</span>])<span class="sc">-</span>m1)<span class="sc">/</span><span class="fu">sqrt</span>(v1) <span class="co"># this is also "AuxMixPoisson:value()" in JAGS</span></span>
+<span id="cb27-85"><a href="#cb27-85" aria-hidden="true" tabindex="-1"></a>    ys2 <span class="ot">=</span> (<span class="sc">-</span><span class="fu">log</span>(tau[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>,<span class="dv">2</span>])<span class="sc">-</span>m2)<span class="sc">/</span><span class="fu">sqrt</span>(v2)</span>
+<span id="cb27-86"><a href="#cb27-86" aria-hidden="true" tabindex="-1"></a>    invSigS <span class="ot">=</span> <span class="dv">1</span><span class="sc">/</span>v1</span>
+<span id="cb27-87"><a href="#cb27-87" aria-hidden="true" tabindex="-1"></a>    invSigS[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>] <span class="ot">=</span> invSigS[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>]<span class="sc">+</span><span class="dv">1</span><span class="sc">/</span>v2</span>
+<span id="cb27-88"><a href="#cb27-88" aria-hidden="true" tabindex="-1"></a>    v1mat <span class="ot">=</span> <span class="fu">matrix</span>()</span>
+<span id="cb27-89"><a href="#cb27-89" aria-hidden="true" tabindex="-1"></a>    <span class="co"># posterior parameters</span></span>
+<span id="cb27-90"><a href="#cb27-90" aria-hidden="true" tabindex="-1"></a>    bPostCov <span class="ot">=</span> <span class="fu">solve</span>(<span class="fu">solve</span>(bPriorCov, <span class="fu">diag</span>(n.param.nodes)) <span class="sc">+</span> <span class="fu">t</span>(X)<span class="sc">%*%</span><span class="fu">diag</span>(invSigS)<span class="sc">%*%</span>X ,<span class="fu">diag</span>(<span class="dv">2</span>))</span>
+<span id="cb27-91"><a href="#cb27-91" aria-hidden="true" tabindex="-1"></a>    bPostMean <span class="ot">=</span> bPostCov<span class="sc">%*%</span>(<span class="fu">solve</span>(bPriorCov,<span class="fu">diag</span>(n.param.nodes))<span class="sc">%*%</span>bPriorMean<span class="sc">+</span> <span class="fu">t</span>(X)<span class="sc">%*%</span><span class="fu">diag</span>(<span class="dv">1</span><span class="sc">/</span><span class="fu">sqrt</span>(v1))<span class="sc">%*%</span>ys1<span class="sc">+</span><span class="fu">t</span>(X[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>,])<span class="sc">%*%</span><span class="fu">diag</span>(<span class="dv">1</span><span class="sc">/</span><span class="fu">sqrt</span>(v2))<span class="sc">%*%</span>ys2) <span class="co"># see eq (8) Fruhwirth-Schnatter and Wagner 2006 or L109-111 from pogit::select_poisson.Rs</span></span>
+<span id="cb27-92"><a href="#cb27-92" aria-hidden="true" tabindex="-1"></a>    <span class="co"># a sample from the posterior</span></span>
+<span id="cb27-93"><a href="#cb27-93" aria-hidden="true" tabindex="-1"></a>    proposal <span class="ot">&lt;-</span> <span class="fu">rmnorm_chol</span>(<span class="dv">1</span>, <span class="at">mean =</span> <span class="fu">c</span>(bPostMean), <span class="at">cholesky =</span> <span class="fu">chol</span>(bPostCov), <span class="at">prec_param =</span> <span class="dv">0</span>)</span>
+<span id="cb27-94"><a href="#cb27-94" aria-hidden="true" tabindex="-1"></a>    <span class="fu">values</span>(model, targetAsScalar) <span class="ot">&lt;&lt;-</span>  proposal</span>
+<span id="cb27-95"><a href="#cb27-95" aria-hidden="true" tabindex="-1"></a>    <span class="co"># update lp, lambda after calculating proposal</span></span>
+<span id="cb27-96"><a href="#cb27-96" aria-hidden="true" tabindex="-1"></a>    model<span class="sc">$</span><span class="fu">calculate</span>(calcNodes)</span>
+<span id="cb27-97"><a href="#cb27-97" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb27-98"><a href="#cb27-98" aria-hidden="true" tabindex="-1"></a>    <span class="do">## get LP and mu</span></span>
+<span id="cb27-99"><a href="#cb27-99" aria-hidden="true" tabindex="-1"></a>    lp <span class="ot">=</span> <span class="fu">values</span>(model, lp.nodes.names)</span>
+<span id="cb27-100"><a href="#cb27-100" aria-hidden="true" tabindex="-1"></a>    lambda <span class="ot">=</span> <span class="fu">values</span>(model, dist.par.names)</span>
+<span id="cb27-101"><a href="#cb27-101" aria-hidden="true" tabindex="-1"></a>    <span class="co">#2. update tau's, step 1 in Fruhwirth-Schnatter et al. 2009</span></span>
+<span id="cb27-102"><a href="#cb27-102" aria-hidden="true" tabindex="-1"></a>    <span class="co"># this part is covered in dataug_pois_iams.R-&gt;iams1_poisson</span></span>
+<span id="cb27-103"><a href="#cb27-103" aria-hidden="true" tabindex="-1"></a>    <span class="co"># tau are latent variables that represent the inter-arrival times of a Poisson process</span></span>
+<span id="cb27-104"><a href="#cb27-104" aria-hidden="true" tabindex="-1"></a>    <span class="co"># get_mixcomp_poisson in dataug_pois_iams.R just gets components that we need for the other functions</span></span>
+<span id="cb27-105"><a href="#cb27-105" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb27-106"><a href="#cb27-106" aria-hidden="true" tabindex="-1"></a>    <span class="fu">update_tau</span>(response.nodes, n.response.nodes, n.zero.response.nodes, lambda)</span>
+<span id="cb27-107"><a href="#cb27-107" aria-hidden="true" tabindex="-1"></a>    t1 <span class="ot">&lt;-</span> tau[,<span class="dv">1</span>]</span>
+<span id="cb27-108"><a href="#cb27-108" aria-hidden="true" tabindex="-1"></a>    t2 <span class="ot">&lt;-</span> tau[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>,<span class="dv">2</span>]</span>
+<span id="cb27-109"><a href="#cb27-109" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 3. update R's, step 2 in Fruhwirth-Schnatter et al. 2009</span></span>
+<span id="cb27-110"><a href="#cb27-110" aria-hidden="true" tabindex="-1"></a>    <span class="co"># this part is covered in dataug_pois_iams.R-&gt;iams2_poisson</span></span>
+<span id="cb27-111"><a href="#cb27-111" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Rmix are normal mixture approximations to Poissons</span></span>
+<span id="cb27-112"><a href="#cb27-112" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb27-113"><a href="#cb27-113" aria-hidden="true" tabindex="-1"></a>    <span class="fu">update_R1</span>(n.response.nodes, lp, t1, mcompm, mcompv, c1)</span>
+<span id="cb27-114"><a href="#cb27-114" aria-hidden="true" tabindex="-1"></a>    <span class="fu">update_R2</span>(response.nodes, n.response.nodes, n.zero.response.nodes, lp, t2, vy, my, wy)</span>
+<span id="cb27-115"><a href="#cb27-115" aria-hidden="true" tabindex="-1"></a>    <span class="co"># keep the model and mvSaved objects consistent</span></span>
+<span id="cb27-116"><a href="#cb27-116" aria-hidden="true" tabindex="-1"></a>    <span class="fu">copy</span>(<span class="at">from =</span> model, <span class="at">to =</span> mvSaved, <span class="at">row =</span> <span class="dv">1</span>, </span>
+<span id="cb27-117"><a href="#cb27-117" aria-hidden="true" tabindex="-1"></a>         <span class="at">nodes =</span> target, <span class="at">logProb =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb27-118"><a href="#cb27-118" aria-hidden="true" tabindex="-1"></a>  },</span>
+<span id="cb27-119"><a href="#cb27-119" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb27-120"><a href="#cb27-120" aria-hidden="true" tabindex="-1"></a>  <span class="at">methods =</span> <span class="fu">list</span>(<span class="at">update_tau =</span> <span class="cf">function</span>(<span class="at">response.nodes =</span> <span class="fu">integer</span>(<span class="dv">1</span>), <span class="at">n.response.nodes =</span> <span class="fu">integer</span>(), <span class="at">n.zero.response.nodes =</span> <span class="fu">integer</span>(), <span class="at">lambda =</span> <span class="fu">double</span>(<span class="dv">1</span>)){</span>
+<span id="cb27-121"><a href="#cb27-121" aria-hidden="true" tabindex="-1"></a>                        taunew <span class="ot">=</span> <span class="fu">matrix</span>(<span class="dv">0</span>, <span class="at">nrow =</span> n.response.nodes, <span class="at">ncol =</span> <span class="dv">2</span>)</span>
+<span id="cb27-122"><a href="#cb27-122" aria-hidden="true" tabindex="-1"></a>                        taunew[,<span class="dv">1</span>] <span class="ot">&lt;-</span> <span class="fu">rexp</span>(n.response.nodes, lambda)</span>
+<span id="cb27-123"><a href="#cb27-123" aria-hidden="true" tabindex="-1"></a>                        tau2 <span class="ot">&lt;-</span> <span class="fu">rbeta</span>(n.response.nodes <span class="sc">-</span> n.zero.response.nodes, response.nodes[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>], <span class="dv">1</span>)</span>
+<span id="cb27-124"><a href="#cb27-124" aria-hidden="true" tabindex="-1"></a>                        taunew[response.nodes <span class="sc">&gt;</span> <span class="dv">0</span>,  <span class="dv">1</span>] <span class="ot">=</span> <span class="dv">1</span><span class="sc">-</span>tau2 <span class="sc">+</span> taunew[response.nodes <span class="sc">&gt;</span> <span class="dv">0</span>,<span class="dv">1</span>]</span>
+<span id="cb27-125"><a href="#cb27-125" aria-hidden="true" tabindex="-1"></a>                        taunew[response.nodes <span class="sc">&gt;</span> <span class="dv">0</span>,  <span class="dv">2</span>]  <span class="ot">=</span> tau2</span>
+<span id="cb27-126"><a href="#cb27-126" aria-hidden="true" tabindex="-1"></a>                        taunew[response.nodes <span class="sc">==</span> <span class="dv">0</span>, <span class="dv">1</span>] <span class="ot">=</span> <span class="dv">1</span> <span class="sc">+</span>  taunew[response.nodes <span class="sc">==</span> <span class="dv">0</span>, <span class="dv">1</span>]</span>
+<span id="cb27-127"><a href="#cb27-127" aria-hidden="true" tabindex="-1"></a>                        tau<span class="ot">&lt;&lt;-</span>taunew</span>
+<span id="cb27-128"><a href="#cb27-128" aria-hidden="true" tabindex="-1"></a>                      },</span>
+<span id="cb27-129"><a href="#cb27-129" aria-hidden="true" tabindex="-1"></a>                    <span class="at">update_R1 =</span> <span class="cf">function</span>(<span class="at">n.response.nodes =</span> <span class="fu">integer</span>(), <span class="at">lp =</span> <span class="fu">double</span>(<span class="dv">1</span>), <span class="at">t1 =</span> <span class="fu">double</span>(<span class="dv">1</span>), <span class="at">mcompm =</span> <span class="fu">double</span>(<span class="dv">2</span>), <span class="at">mcompv =</span> <span class="fu">double</span>(<span class="dv">2</span>), <span class="at">c1 =</span> <span class="fu">double</span>(<span class="dv">2</span>))</span>
+<span id="cb27-130"><a href="#cb27-130" aria-hidden="true" tabindex="-1"></a>                      {</span>
+<span id="cb27-131"><a href="#cb27-131" aria-hidden="true" tabindex="-1"></a>                        minlogt1minlp <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="sc">-</span><span class="fu">log</span>(t1) <span class="sc">-</span> lp,<span class="at">ncol=</span><span class="dv">10</span>,<span class="at">nrow=</span>n.response.nodes)</span>
+<span id="cb27-132"><a href="#cb27-132" aria-hidden="true" tabindex="-1"></a>                        repmcompm  <span class="ot">&lt;-</span> <span class="fu">t</span>(<span class="fu">matrix</span>(mcompm[<span class="dv">1</span>,], <span class="at">ncol =</span> n.response.nodes, <span class="at">nrow =</span> <span class="dv">10</span>))</span>
+<span id="cb27-133"><a href="#cb27-133" aria-hidden="true" tabindex="-1"></a>                        repmcompv <span class="ot">&lt;-</span> <span class="fu">t</span>(<span class="fu">matrix</span>(mcompv[<span class="dv">1</span>,], <span class="at">ncol =</span> n.response.nodes, <span class="at">nrow =</span> <span class="dv">10</span>))</span>
+<span id="cb27-134"><a href="#cb27-134" aria-hidden="true" tabindex="-1"></a>                        rgm   <span class="ot">&lt;-</span> c1 <span class="sc">-</span> <span class="fl">0.5</span><span class="sc">*</span>(minlogt1minlp <span class="sc">-</span> repmcompm)<span class="sc">^</span><span class="dv">2</span><span class="sc">/</span>repmcompv</span>
+<span id="cb27-135"><a href="#cb27-135" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>){ <span class="co">#ncol rgm</span></span>
+<span id="cb27-136"><a href="#cb27-136" aria-hidden="true" tabindex="-1"></a>                          rgm[rgm[,i]<span class="sc">==</span><span class="dv">0</span>,i] <span class="ot">&lt;-</span> <span class="sc">-</span><span class="cn">Inf</span></span>
+<span id="cb27-137"><a href="#cb27-137" aria-hidden="true" tabindex="-1"></a>                        }</span>
+<span id="cb27-138"><a href="#cb27-138" aria-hidden="true" tabindex="-1"></a>                        mx <span class="ot">&lt;-</span> <span class="fu">numeric</span>(n.response.nodes)</span>
+<span id="cb27-139"><a href="#cb27-139" aria-hidden="true" tabindex="-1"></a>                        e1 <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="dv">0</span>, <span class="at">ncol =</span> <span class="dv">10</span>, <span class="at">nrow =</span> n.response.nodes)</span>
+<span id="cb27-140"><a href="#cb27-140" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>n.response.nodes){</span>
+<span id="cb27-141"><a href="#cb27-141" aria-hidden="true" tabindex="-1"></a>                          mx[i] <span class="ot">&lt;-</span> <span class="fu">max</span>(rgm[i,])</span>
+<span id="cb27-142"><a href="#cb27-142" aria-hidden="true" tabindex="-1"></a>                          <span class="cf">if</span>(mx[i]<span class="sc">==-</span><span class="cn">Inf</span>)mx[i]<span class="ot">=</span><span class="dv">0</span></span>
+<span id="cb27-143"><a href="#cb27-143" aria-hidden="true" tabindex="-1"></a>                          e1[i,] <span class="ot">&lt;-</span> <span class="fu">exp</span>(rgm[i,]<span class="sc">-</span>mx[i])</span>
+<span id="cb27-144"><a href="#cb27-144" aria-hidden="true" tabindex="-1"></a>                        }</span>
+<span id="cb27-145"><a href="#cb27-145" aria-hidden="true" tabindex="-1"></a>                        rgmod <span class="ot">&lt;-</span> <span class="fu">numeric</span>(n.response.nodes)</span>
+<span id="cb27-146"><a href="#cb27-146" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>n.response.nodes){</span>
+<span id="cb27-147"><a href="#cb27-147" aria-hidden="true" tabindex="-1"></a>                          rgmod[i] <span class="ot">&lt;-</span> <span class="fu">sum</span>(e1[i,])</span>
+<span id="cb27-148"><a href="#cb27-148" aria-hidden="true" tabindex="-1"></a>                        }</span>
+<span id="cb27-149"><a href="#cb27-149" aria-hidden="true" tabindex="-1"></a>                        e1.new <span class="ot">=</span> <span class="fu">matrix</span>(<span class="dv">0</span>, <span class="at">ncol =</span> <span class="dv">10</span>, <span class="at">nrow =</span> n.response.nodes)</span>
+<span id="cb27-150"><a href="#cb27-150" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>){</span>
+<span id="cb27-151"><a href="#cb27-151" aria-hidden="true" tabindex="-1"></a>                          e1.new[,i] <span class="ot">&lt;-</span> e1[,i]<span class="sc">/</span>rgmod <span class="co"># for safety might want to check for 0/0 i.e., nan</span></span>
+<span id="cb27-152"><a href="#cb27-152" aria-hidden="true" tabindex="-1"></a>                        }</span>
+<span id="cb27-153"><a href="#cb27-153" aria-hidden="true" tabindex="-1"></a>                        tri.mat <span class="ot">=</span> <span class="fu">matrix</span>(<span class="dv">1</span>, <span class="dv">10</span>, <span class="dv">10</span>)</span>
+<span id="cb27-154"><a href="#cb27-154" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span> (j <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">9</span>) {</span>
+<span id="cb27-155"><a href="#cb27-155" aria-hidden="true" tabindex="-1"></a>                          <span class="cf">for</span> (i <span class="cf">in</span> (j<span class="sc">+</span><span class="dv">1</span>)<span class="sc">:</span><span class="dv">10</span>) {</span>
+<span id="cb27-156"><a href="#cb27-156" aria-hidden="true" tabindex="-1"></a>                            tri.mat[i,j] <span class="ot">=</span> <span class="dv">0</span></span>
+<span id="cb27-157"><a href="#cb27-157" aria-hidden="true" tabindex="-1"></a>                          }</span>
+<span id="cb27-158"><a href="#cb27-158" aria-hidden="true" tabindex="-1"></a>                        }</span>
+<span id="cb27-159"><a href="#cb27-159" aria-hidden="true" tabindex="-1"></a>                        Fn    <span class="ot">&lt;-</span> e1.new<span class="sc">%*%</span>tri.mat</span>
+<span id="cb27-160"><a href="#cb27-160" aria-hidden="true" tabindex="-1"></a>                        </span>
+<span id="cb27-161"><a href="#cb27-161" aria-hidden="true" tabindex="-1"></a>                        <span class="co"># determination of random indicators R1</span></span>
+<span id="cb27-162"><a href="#cb27-162" aria-hidden="true" tabindex="-1"></a>                        u <span class="ot">&lt;-</span> <span class="fu">runif</span>(n.response.nodes, <span class="dv">0</span>, <span class="dv">1</span>)</span>
+<span id="cb27-163"><a href="#cb27-163" aria-hidden="true" tabindex="-1"></a>                        R1.temp <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="dv">0</span>, <span class="at">ncol =</span> <span class="dv">10</span>, <span class="at">nrow =</span> n.response.nodes)</span>
+<span id="cb27-164"><a href="#cb27-164" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>){</span>
+<span id="cb27-165"><a href="#cb27-165" aria-hidden="true" tabindex="-1"></a>                          R1.temp[,i] <span class="ot">&lt;-</span> u<span class="sc">&lt;</span>Fn[,i] <span class="co">#can probably replace this step by "sample()"?</span></span>
+<span id="cb27-166"><a href="#cb27-166" aria-hidden="true" tabindex="-1"></a>                        }</span>
+<span id="cb27-167"><a href="#cb27-167" aria-hidden="true" tabindex="-1"></a>                        </span>
+<span id="cb27-168"><a href="#cb27-168" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>n.response.nodes){</span>
+<span id="cb27-169"><a href="#cb27-169" aria-hidden="true" tabindex="-1"></a>                          R1[i] <span class="ot">&lt;&lt;-</span> <span class="dv">11</span><span class="sc">-</span><span class="fu">sum</span>(R1.temp[i,])</span>
+<span id="cb27-170"><a href="#cb27-170" aria-hidden="true" tabindex="-1"></a>                        }</span>
+<span id="cb27-171"><a href="#cb27-171" aria-hidden="true" tabindex="-1"></a>                      },</span>
+<span id="cb27-172"><a href="#cb27-172" aria-hidden="true" tabindex="-1"></a>                    <span class="at">update_R2 =</span> <span class="cf">function</span>(<span class="at">response.nodes =</span> <span class="fu">integer</span>(<span class="dv">1</span>), <span class="at">n.response.nodes =</span> <span class="fu">integer</span>(), <span class="at">n.zero.response.nodes =</span> <span class="fu">integer</span>(), <span class="at">lp =</span> <span class="fu">double</span>(<span class="dv">1</span>), <span class="at">t2 =</span> <span class="fu">double</span>(<span class="dv">1</span>), <span class="at">vy =</span> <span class="fu">double</span>(<span class="dv">2</span>), <span class="at">my =</span> <span class="fu">double</span>(<span class="dv">2</span>), <span class="at">wy =</span> <span class="fu">double</span>(<span class="dv">2</span>)){</span>
+<span id="cb27-173"><a href="#cb27-173" aria-hidden="true" tabindex="-1"></a>                      <span class="co"># this function only works if l380-384 are here instead of in "setup" for some reason</span></span>
+<span id="cb27-174"><a href="#cb27-174" aria-hidden="true" tabindex="-1"></a>                      <span class="co"># otherwise it returns NaN..</span></span>
+<span id="cb27-175"><a href="#cb27-175" aria-hidden="true" tabindex="-1"></a>                        vy2 <span class="ot">&lt;-</span> vy</span>
+<span id="cb27-176"><a href="#cb27-176" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>){</span>
+<span id="cb27-177"><a href="#cb27-177" aria-hidden="true" tabindex="-1"></a>                          vy2[vy2[,i]<span class="sc">==</span><span class="dv">0</span>,i]<span class="ot">&lt;-</span><span class="dv">1</span></span>
+<span id="cb27-178"><a href="#cb27-178" aria-hidden="true" tabindex="-1"></a>                        }</span>
+<span id="cb27-179"><a href="#cb27-179" aria-hidden="true" tabindex="-1"></a>                        lwy <span class="ot">&lt;-</span> wy</span>
+<span id="cb27-180"><a href="#cb27-180" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>){</span>
+<span id="cb27-181"><a href="#cb27-181" aria-hidden="true" tabindex="-1"></a>                          lwy[lwy[,i]<span class="sc">==</span><span class="dv">0</span>,i] <span class="ot">&lt;-</span> <span class="dv">1</span></span>
+<span id="cb27-182"><a href="#cb27-182" aria-hidden="true" tabindex="-1"></a>                          lwy[lwy[,i]<span class="sc">&lt;</span><span class="dv">0</span>,i] <span class="ot">&lt;-</span> <span class="dv">1</span></span>
+<span id="cb27-183"><a href="#cb27-183" aria-hidden="true" tabindex="-1"></a>                          lwy[,i] <span class="ot">&lt;-</span> <span class="fu">log</span>(lwy[,i])</span>
+<span id="cb27-184"><a href="#cb27-184" aria-hidden="true" tabindex="-1"></a>                        }</span>
+<span id="cb27-185"><a href="#cb27-185" aria-hidden="true" tabindex="-1"></a>                        lvy <span class="ot">&lt;-</span> vy</span>
+<span id="cb27-186"><a href="#cb27-186" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>){</span>
+<span id="cb27-187"><a href="#cb27-187" aria-hidden="true" tabindex="-1"></a>                          lvy[lvy[,i]<span class="sc">==</span><span class="dv">0</span>,i] <span class="ot">&lt;-</span> <span class="dv">1</span></span>
+<span id="cb27-188"><a href="#cb27-188" aria-hidden="true" tabindex="-1"></a>                          lvy[lvy[,i]<span class="sc">&lt;</span><span class="dv">0</span>,i] <span class="ot">&lt;-</span> <span class="dv">1</span></span>
+<span id="cb27-189"><a href="#cb27-189" aria-hidden="true" tabindex="-1"></a>                          lvy[,i] <span class="ot">&lt;-</span> <span class="fu">log</span>(lvy[,i])</span>
+<span id="cb27-190"><a href="#cb27-190" aria-hidden="true" tabindex="-1"></a>                        }</span>
+<span id="cb27-191"><a href="#cb27-191" aria-hidden="true" tabindex="-1"></a>                        c2 <span class="ot">&lt;-</span> (lwy <span class="sc">-</span> <span class="fl">0.5</span><span class="sc">*</span>lvy)</span>
+<span id="cb27-192"><a href="#cb27-192" aria-hidden="true" tabindex="-1"></a>                        </span>
+<span id="cb27-193"><a href="#cb27-193" aria-hidden="true" tabindex="-1"></a>                        minlogt2minlp <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="sc">-</span><span class="fu">log</span>(t2) <span class="sc">-</span> lp[response.nodes<span class="sc">&gt;</span><span class="dv">0</span>],<span class="at">ncol=</span><span class="dv">10</span>,<span class="at">nrow=</span>n.response.nodes<span class="sc">-</span>n.zero.response.nodes)</span>
+<span id="cb27-194"><a href="#cb27-194" aria-hidden="true" tabindex="-1"></a>                        </span>
+<span id="cb27-195"><a href="#cb27-195" aria-hidden="true" tabindex="-1"></a>                        kill <span class="ot">&lt;-</span> <span class="fu">matrix</span>(vy <span class="sc">&gt;</span> <span class="dv">0</span>, n.response.nodes <span class="sc">-</span> n.zero.response.nodes, <span class="dv">10</span>)</span>
+<span id="cb27-196"><a href="#cb27-196" aria-hidden="true" tabindex="-1"></a>                        xx     <span class="ot">&lt;-</span> minlogt2minlp<span class="sc">*</span>kill</span>
+<span id="cb27-197"><a href="#cb27-197" aria-hidden="true" tabindex="-1"></a>                        </span>
+<span id="cb27-198"><a href="#cb27-198" aria-hidden="true" tabindex="-1"></a>                        rgmx   <span class="ot">&lt;-</span> c2 <span class="sc">-</span> <span class="fl">0.5</span><span class="sc">*</span>(xx <span class="sc">-</span> my)<span class="sc">^</span><span class="dv">2</span><span class="sc">/</span>vy2</span>
+<span id="cb27-199"><a href="#cb27-199" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>){ <span class="co">#ncol r gm</span></span>
+<span id="cb27-200"><a href="#cb27-200" aria-hidden="true" tabindex="-1"></a>                          rgmx[rgmx[,i]<span class="sc">==</span><span class="dv">0</span>,i] <span class="ot">&lt;-</span> <span class="sc">-</span><span class="cn">Inf</span></span>
+<span id="cb27-201"><a href="#cb27-201" aria-hidden="true" tabindex="-1"></a>                        }</span>
+<span id="cb27-202"><a href="#cb27-202" aria-hidden="true" tabindex="-1"></a>                        e2 <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="dv">0</span>,<span class="at">nrow =</span> n.response.nodes<span class="sc">-</span>n.zero.response.nodes, <span class="at">ncol =</span> <span class="dv">10</span>)</span>
+<span id="cb27-203"><a href="#cb27-203" aria-hidden="true" tabindex="-1"></a>                        mx2 <span class="ot">=</span> <span class="fu">numeric</span>(n.response.nodes<span class="sc">-</span>n.zero.response.nodes)</span>
+<span id="cb27-204"><a href="#cb27-204" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>(n.response.nodes<span class="sc">-</span>n.zero.response.nodes)){</span>
+<span id="cb27-205"><a href="#cb27-205" aria-hidden="true" tabindex="-1"></a>                          mx2[i] <span class="ot">=</span> <span class="fu">max</span>(rgmx[i,])</span>
+<span id="cb27-206"><a href="#cb27-206" aria-hidden="true" tabindex="-1"></a>                          <span class="cf">if</span>(mx2[i]<span class="sc">==-</span><span class="cn">Inf</span>)mx2[i]<span class="ot">=</span><span class="dv">0</span></span>
+<span id="cb27-207"><a href="#cb27-207" aria-hidden="true" tabindex="-1"></a>                          e2[i,] <span class="ot">&lt;-</span> <span class="fu">exp</span>(rgmx[i,]<span class="sc">-</span>mx2[i])</span>
+<span id="cb27-208"><a href="#cb27-208" aria-hidden="true" tabindex="-1"></a>                        }</span>
+<span id="cb27-209"><a href="#cb27-209" aria-hidden="true" tabindex="-1"></a>                        rgmodx <span class="ot">&lt;-</span> <span class="fu">numeric</span>(n.response.nodes<span class="sc">-</span>n.zero.response.nodes)</span>
+<span id="cb27-210"><a href="#cb27-210" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>(n.response.nodes<span class="sc">-</span>n.zero.response.nodes)){</span>
+<span id="cb27-211"><a href="#cb27-211" aria-hidden="true" tabindex="-1"></a>                          rgmodx[i] <span class="ot">&lt;-</span> <span class="fu">sum</span>(e2[i,])</span>
+<span id="cb27-212"><a href="#cb27-212" aria-hidden="true" tabindex="-1"></a>                        }</span>
+<span id="cb27-213"><a href="#cb27-213" aria-hidden="true" tabindex="-1"></a>                        e2.new <span class="ot">=</span> <span class="fu">matrix</span>(<span class="dv">0</span>,<span class="at">nrow=</span>n.response.nodes<span class="sc">-</span>n.zero.response.nodes, <span class="at">ncol =</span> <span class="dv">10</span>)</span>
+<span id="cb27-214"><a href="#cb27-214" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>){</span>
+<span id="cb27-215"><a href="#cb27-215" aria-hidden="true" tabindex="-1"></a>                          e2.new[,i] <span class="ot">&lt;-</span> e2[,i]<span class="sc">/</span>rgmodx <span class="co"># for safety might want to check for 0/0 i.e., nan</span></span>
+<span id="cb27-216"><a href="#cb27-216" aria-hidden="true" tabindex="-1"></a>                        }</span>
+<span id="cb27-217"><a href="#cb27-217" aria-hidden="true" tabindex="-1"></a>                        </span>
+<span id="cb27-218"><a href="#cb27-218" aria-hidden="true" tabindex="-1"></a>                        tri.mat <span class="ot">=</span> <span class="fu">matrix</span>(<span class="dv">1</span>, <span class="dv">10</span>, <span class="dv">10</span>)</span>
+<span id="cb27-219"><a href="#cb27-219" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span> (j <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">9</span>) {</span>
+<span id="cb27-220"><a href="#cb27-220" aria-hidden="true" tabindex="-1"></a>                          <span class="cf">for</span> (i <span class="cf">in</span> (j<span class="sc">+</span><span class="dv">1</span>)<span class="sc">:</span><span class="dv">10</span>) {</span>
+<span id="cb27-221"><a href="#cb27-221" aria-hidden="true" tabindex="-1"></a>                            tri.mat[i,j] <span class="ot">=</span> <span class="dv">0</span></span>
+<span id="cb27-222"><a href="#cb27-222" aria-hidden="true" tabindex="-1"></a>                          }</span>
+<span id="cb27-223"><a href="#cb27-223" aria-hidden="true" tabindex="-1"></a>                        }</span>
+<span id="cb27-224"><a href="#cb27-224" aria-hidden="true" tabindex="-1"></a>                        </span>
+<span id="cb27-225"><a href="#cb27-225" aria-hidden="true" tabindex="-1"></a>                        Fx     <span class="ot">&lt;-</span> e2.new<span class="sc">%*%</span>tri.mat</span>
+<span id="cb27-226"><a href="#cb27-226" aria-hidden="true" tabindex="-1"></a>                        </span>
+<span id="cb27-227"><a href="#cb27-227" aria-hidden="true" tabindex="-1"></a>                        <span class="co"># determination of random indicators R2</span></span>
+<span id="cb27-228"><a href="#cb27-228" aria-hidden="true" tabindex="-1"></a>                        ux <span class="ot">&lt;-</span> <span class="fu">runif</span>(n.response.nodes <span class="sc">-</span> n.zero.response.nodes, <span class="dv">0</span>, <span class="dv">1</span>)</span>
+<span id="cb27-229"><a href="#cb27-229" aria-hidden="true" tabindex="-1"></a>                        R2.temp <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="dv">0</span>, <span class="at">ncol =</span> <span class="dv">10</span>, <span class="at">nrow =</span> n.response.nodes <span class="sc">-</span> n.zero.response.nodes)</span>
+<span id="cb27-230"><a href="#cb27-230" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>){</span>
+<span id="cb27-231"><a href="#cb27-231" aria-hidden="true" tabindex="-1"></a>                          R2.temp[,i] <span class="ot">&lt;-</span> ux<span class="sc">&lt;</span>Fx[,i]</span>
+<span id="cb27-232"><a href="#cb27-232" aria-hidden="true" tabindex="-1"></a>                        }</span>
+<span id="cb27-233"><a href="#cb27-233" aria-hidden="true" tabindex="-1"></a>                        </span>
+<span id="cb27-234"><a href="#cb27-234" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>(n.response.nodes<span class="sc">-</span>n.zero.response.nodes)){</span>
+<span id="cb27-235"><a href="#cb27-235" aria-hidden="true" tabindex="-1"></a>                          R2[i] <span class="ot">&lt;&lt;-</span> <span class="dv">11</span><span class="sc">-</span><span class="fu">sum</span>(R2.temp[i,])</span>
+<span id="cb27-236"><a href="#cb27-236" aria-hidden="true" tabindex="-1"></a>                        }</span>
+<span id="cb27-237"><a href="#cb27-237" aria-hidden="true" tabindex="-1"></a>                      },</span>
+<span id="cb27-238"><a href="#cb27-238" aria-hidden="true" tabindex="-1"></a>                 <span class="at">reset =</span> <span class="cf">function</span> () {}</span>
+<span id="cb27-239"><a href="#cb27-239" aria-hidden="true" tabindex="-1"></a>                    )</span>
+<span id="cb27-240"><a href="#cb27-240" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>write some BUGS code for a simple Poisson regression;</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(nimble)</span>
-<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>pois.glm <span class="ot">&lt;-</span> <span class="fu">nimbleCode</span>({</span>
-<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>  <span class="do">## Likelihood</span></span>
-<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>N){</span>
-<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>    y[i] <span class="sc">~</span> <span class="fu">dpois</span>(lambda[i])</span>
-<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">log</span>(lambda[i]) <span class="ot">&lt;-</span> eta[i]</span>
-<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>    eta[i] <span class="ot">&lt;-</span> <span class="fu">inprod</span>(beta[<span class="dv">1</span><span class="sc">:</span>k],X[i,])</span>
-<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>  }     </span>
-<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>  <span class="do">## Priors </span></span>
-<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>k){</span>
-<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a>    beta[i] <span class="sc">~</span> <span class="fu">dnorm</span>(<span class="dv">0</span>,<span class="dv">1</span>)</span>
-<span id="cb24-12"><a href="#cb24-12" aria-hidden="true" tabindex="-1"></a>  }</span>
-<span id="cb24-13"><a href="#cb24-13" aria-hidden="true" tabindex="-1"></a>})</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(nimble)</span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>pois.glm <span class="ot">&lt;-</span> <span class="fu">nimbleCode</span>({</span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>  <span class="do">## Likelihood</span></span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>N){</span>
+<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a>    y[i] <span class="sc">~</span> <span class="fu">dpois</span>(lambda[i])</span>
+<span id="cb28-6"><a href="#cb28-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">log</span>(lambda[i]) <span class="ot">&lt;-</span> eta[i]</span>
+<span id="cb28-7"><a href="#cb28-7" aria-hidden="true" tabindex="-1"></a>    eta[i] <span class="ot">&lt;-</span> <span class="fu">inprod</span>(beta[<span class="dv">1</span><span class="sc">:</span>k],X[i,])</span>
+<span id="cb28-8"><a href="#cb28-8" aria-hidden="true" tabindex="-1"></a>  }     </span>
+<span id="cb28-9"><a href="#cb28-9" aria-hidden="true" tabindex="-1"></a>  <span class="do">## Priors </span></span>
+<span id="cb28-10"><a href="#cb28-10" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span>(i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>k){</span>
+<span id="cb28-11"><a href="#cb28-11" aria-hidden="true" tabindex="-1"></a>    beta[i] <span class="sc">~</span> <span class="fu">dnorm</span>(<span class="dv">0</span>,<span class="dv">1</span>)</span>
+<span id="cb28-12"><a href="#cb28-12" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb28-13"><a href="#cb28-13" aria-hidden="true" tabindex="-1"></a>})</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>set-up the model:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>dat <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">X=</span><span class="fu">cbind</span>(<span class="dv">1</span>,x),  <span class="co"># predictors</span></span>
-<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>                <span class="at">y=</span>y)  <span class="co"># DV</span></span>
-<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>const <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
-<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>                <span class="at">N=</span>N,  <span class="co"># sample size</span></span>
-<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>                <span class="at">k =</span><span class="fu">ncol</span>(dat<span class="sc">$</span>X)) <span class="co"># number of covariates,</span></span>
-<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a><span class="co"># construct model object</span></span>
-<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>model <span class="ot">&lt;-</span> <span class="fu">nimbleModel</span>(pois.glm, const, dat, <span class="at">inits =</span> <span class="fu">list</span>(<span class="at">beta =</span> <span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">1</span>)))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>dat <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">X=</span><span class="fu">cbind</span>(<span class="dv">1</span>,x),  <span class="co"># predictors</span></span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>                <span class="at">y=</span>y)  <span class="co"># DV</span></span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>const <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a>                <span class="at">N=</span>N,  <span class="co"># sample size</span></span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a>                <span class="at">k =</span><span class="fu">ncol</span>(dat<span class="sc">$</span>X)) <span class="co"># number of covariates,</span></span>
+<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a><span class="co"># construct model object</span></span>
+<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a>model <span class="ot">&lt;-</span> <span class="fu">nimbleModel</span>(pois.glm, const, dat, <span class="at">inits =</span> <span class="fu">list</span>(<span class="at">beta =</span> <span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">1</span>)))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stderr">
 <pre><code>Defining model</code></pre>
 </div>
@@ -687,7 +786,7 @@ Attaching package: 'nimble'</code></pre>
 <div class="cell-output cell-output-stderr">
 <pre><code>Checking model sizes and dimensions</code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>mod <span class="ot">&lt;-</span> nimble<span class="sc">::</span><span class="fu">compileNimble</span>(model)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb35"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>mod <span class="ot">&lt;-</span> nimble<span class="sc">::</span><span class="fu">compileNimble</span>(model)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stderr">
 <pre><code>Compiling
   [Note] This may take a minute.
@@ -696,20 +795,20 @@ Attaching package: 'nimble'</code></pre>
 </div>
 <p>and add and run it for a few iterations to see that we get something sensible:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb33"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>nimbleMCMCconf <span class="ot">&lt;-</span> <span class="fu">configureMCMC</span>(mod, <span class="at">monitors =</span> <span class="fu">c</span>(<span class="st">"beta"</span>), <span class="at">print =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>nimbleMCMCconf<span class="sc">$</span><span class="fu">removeSampler</span>(<span class="st">"beta"</span>)</span>
-<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>nimbleMCMCconf<span class="sc">$</span><span class="fu">addSampler</span>(<span class="st">"beta"</span>,<span class="at">type=</span><span class="st">"sampler_glm_pois"</span>, <span class="at">print =</span> T)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb37"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a>nimbleMCMCconf <span class="ot">&lt;-</span> <span class="fu">configureMCMC</span>(mod, <span class="at">monitors =</span> <span class="fu">c</span>(<span class="st">"beta"</span>), <span class="at">print =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a>nimbleMCMCconf<span class="sc">$</span><span class="fu">removeSampler</span>(<span class="st">"beta"</span>)</span>
+<span id="cb37-3"><a href="#cb37-3" aria-hidden="true" tabindex="-1"></a>nimbleMCMCconf<span class="sc">$</span><span class="fu">addSampler</span>(<span class="st">"beta"</span>,<span class="at">type=</span><span class="st">"sampler_glm_pois"</span>, <span class="at">print =</span> T)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1] glm_pois sampler: beta</code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb35"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>nimbleMCMCb <span class="ot">&lt;-</span> <span class="fu">buildMCMC</span>(nimbleMCMCconf)</span>
-<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>nimbleMCMCc <span class="ot">&lt;-</span> <span class="fu">compileNimble</span>(nimbleMCMCb, <span class="at">project =</span> mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb39"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a>nimbleMCMCb <span class="ot">&lt;-</span> <span class="fu">buildMCMC</span>(nimbleMCMCconf)</span>
+<span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a>nimbleMCMCc <span class="ot">&lt;-</span> <span class="fu">compileNimble</span>(nimbleMCMCb, <span class="at">project =</span> mod)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stderr">
 <pre><code>Compiling
   [Note] This may take a minute.
   [Note] Use 'showCompilerOutput = TRUE' to see C++ compilation details.</code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb37"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a>test_run <span class="ot">&lt;-</span> <span class="fu">runMCMC</span>(nimbleMCMCc, <span class="at">niter =</span> <span class="dv">1000</span>, <span class="at">nburnin =</span> <span class="dv">500</span>, <span class="at">thin =</span> <span class="dv">1</span>, <span class="at">nchains =</span> <span class="dv">3</span>, <span class="at">samplesAsCodaMCMC =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb41"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a>test_run <span class="ot">&lt;-</span> <span class="fu">runMCMC</span>(nimbleMCMCc, <span class="at">niter =</span> <span class="dv">1000</span>, <span class="at">nburnin =</span> <span class="dv">500</span>, <span class="at">thin =</span> <span class="dv">1</span>, <span class="at">nchains =</span> <span class="dv">3</span>, <span class="at">samplesAsCodaMCMC =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stderr">
 <pre><code>running chain 1...</code></pre>
 </div>
@@ -731,7 +830,7 @@ Attaching package: 'nimble'</code></pre>
 <pre><code>|-------------|-------------|-------------|-------------|
 |-------------------------------------------------------|</code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb44"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(test_run)<span class="co"># wrong answer :(</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb48"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(test_run)<span class="co"># wrong answer :(</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>
 Iterations = 1:500
@@ -743,47 +842,47 @@ Sample size per chain = 500
    plus standard error of the mean:
 
           Mean      SD  Naive SE Time-series SE
-beta[1] 0.5437 0.03011 0.0007774      0.0021115
-beta[2] 1.2354 0.01719 0.0004438      0.0009539
+beta[1] 0.5421 0.02846 0.0007348      0.0018634
+beta[2] 1.2361 0.01651 0.0004263      0.0008702
 
 2. Quantiles for each variable:
 
-         2.5%    25%   50%    75%  97.5%
-beta[1] 0.486 0.5228 0.543 0.5644 0.6035
-beta[2] 1.201 1.2242 1.235 1.2473 1.2681</code></pre>
+          2.5%    25%    50%    75%  97.5%
+beta[1] 0.4844 0.5229 0.5426 0.5619 0.5967
+beta[2] 1.2041 1.2255 1.2360 1.2470 1.2682</code></pre>
 </div>
 </div>
 <p>compare the solution to <em>pogit</em>:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb46"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a>pogit_run <span class="ot">&lt;-</span> pogit<span class="sc">::</span><span class="fu">poissonBvs</span>(y, <span class="at">X =</span> <span class="fu">cbind</span>(<span class="dv">1</span>,x), <span class="at">BVS =</span> <span class="cn">FALSE</span>, <span class="at">mcmc =</span> <span class="fu">list</span>(<span class="at">M =</span> <span class="dv">1000</span>, <span class="at">burnin =</span> <span class="dv">500</span>, <span class="at">thin =</span> <span class="dv">1</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb50"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a>pogit_run <span class="ot">&lt;-</span> pogit<span class="sc">::</span><span class="fu">poissonBvs</span>(y, <span class="at">X =</span> <span class="fu">cbind</span>(<span class="dv">1</span>,x), <span class="at">BVS =</span> <span class="cn">FALSE</span>, <span class="at">mcmc =</span> <span class="fu">list</span>(<span class="at">M =</span> <span class="dv">1000</span>, <span class="at">burnin =</span> <span class="dv">500</span>, <span class="at">thin =</span> <span class="dv">1</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>
 MCMC for the Poisson model:
 
-it = 1 /--- duration of MCMC so far: 0.26 sec.,  expected time to end: Inf  min. 
-it = 2 /--- duration of MCMC so far: 0.27 sec.,  expected time to end: 6.65  min. 
-it = 3 /--- duration of MCMC so far: 0.27 sec.,  expected time to end: 3.37  min. 
-it = 4 /--- duration of MCMC so far: 0.27 sec.,  expected time to end: 2.28  min. 
-it = 5 /--- duration of MCMC so far: 0.28 sec.,  expected time to end: 1.73  min. 
-it = 10 /--- duration of MCMC so far: 0.3 sec.,  expected time to end: 0.83  min. 
-it = 20 /--- duration of MCMC so far: 0.35 sec.,  expected time to end: 0.45  min. 
-it = 50 /--- duration of MCMC so far: 0.48 sec.,  expected time to end: 0.24  min. 
-it = 100 /--- duration of MCMC so far: 0.69 sec.,  expected time to end: 0.16  min. 
-it = 200 /--- duration of MCMC so far: 1.4 sec.,  expected time to end: 0.15  min. 
+it = 1 /--- duration of MCMC so far: 0.56 sec.,  expected time to end: Inf  min. 
+it = 2 /--- duration of MCMC so far: 0.56 sec.,  expected time to end: 14.02  min. 
+it = 3 /--- duration of MCMC so far: 0.57 sec.,  expected time to end: 7.07  min. 
+it = 4 /--- duration of MCMC so far: 0.57 sec.,  expected time to end: 4.74  min. 
+it = 5 /--- duration of MCMC so far: 0.57 sec.,  expected time to end: 3.58  min. 
+it = 10 /--- duration of MCMC so far: 0.59 sec.,  expected time to end: 1.64  min. 
+it = 20 /--- duration of MCMC so far: 0.64 sec.,  expected time to end: 0.84  min. 
+it = 50 /--- duration of MCMC so far: 0.76 sec.,  expected time to end: 0.38  min. 
+it = 100 /--- duration of MCMC so far: 0.96 sec.,  expected time to end: 0.23  min. 
+it = 200 /--- duration of MCMC so far: 1.36 sec.,  expected time to end: 0.15  min. 
 it = 500 /--- duration of MCMC so far: 2.55 sec.,  expected time to end: 0.09  min. 
-it = 1000 /--- duration of MCMC so far: 4.46 sec.,  expected time to end: 0.04  min. 
-it = 1500 /--- duration of MCMC (total): 6.37 sec. 
+it = 1000 /--- duration of MCMC so far: 4.55 sec.,  expected time to end: 0.04  min. 
+it = 1500 /--- duration of MCMC (total): 6.85 sec. 
  </code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb48"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(pogit_run<span class="sc">$</span>samplesP<span class="sc">$</span>beta) <span class="co"># correct answer</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb52"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb52-1"><a href="#cb52-1" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(pogit_run<span class="sc">$</span>samplesP<span class="sc">$</span>beta) <span class="co"># correct answer</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>     beta.0           beta.1      
- Min.   :0.3825   Min.   :0.5695  
- 1st Qu.:0.9781   1st Qu.:0.9950  
- Median :0.9914   Median :1.0043  
- Mean   :0.9891   Mean   :1.0044  
- 3rd Qu.:1.0045   3rd Qu.:1.0138  
- Max.   :1.0501   Max.   :1.0568  </code></pre>
+ Min.   :0.4160   Min.   :0.5596  
+ 1st Qu.:0.9732   1st Qu.:0.9958  
+ Median :0.9868   Median :1.0058  
+ Mean   :0.9862   Mean   :1.0053  
+ 3rd Qu.:1.0023   3rd Qu.:1.0155  
+ Max.   :1.0534   Max.   :1.0550  </code></pre>
 </div>
 </div>
 </section>
