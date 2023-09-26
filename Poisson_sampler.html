@@ -118,8 +118,8 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <h2 class="anchored" data-anchor-id="the-sampler">The Sampler</h2>
 <p>JAGS has not one GLM sampler. It might seem like that at first glance because JAGS’s “GLM factory” has multiple scripts (such as <a href="https://github.com/todesking/JAGS-code/blob/master/src/modules/glm/samplers/GLMMethod.cc">this one</a>) specific to GLMs. However, the idea is that when fed a model (script), JAGS first checks if that model can be represented as a linear model. If it can, it checks the distribution for the responses and is fed to a corresponding sampler for that distribution. Consequently, the “GLM sampler” is in fact a multitude of samplers. Each sampler is based on the same idea; the GLM can be represented as a linear model with some smart statistical voodoo.</p>
 <p>For the Poisson case this is based on the work by <a href="https://research.wu.ac.at/en/publications/data-augmentation-and-gibbs-sampling-for-regression-models-of-sma-7">Fruhwirth-Schnatter and Wagner 2004</a> and <a href="https://link.springer.com/article/10.1007/s11222-008-9109-4">Fruhwirth-Schnatter et al.&nbsp;2009</a>.</p>
-<p>The sampler relies on representing Poisson random variables in terms of their inter-arrival times, and approximating the distribution of the inter-arrival times by mixtures of normal distributions. Conditional on some quantities, the Poisson regression can be (approximately) represented as a linear regression. On each iteration of the sampler, the parameters are (conditionally) sampled from a multivariate normal distribution. Consequently, we can think of the sampler (algorithm) in three steps: 1) update parameters conditional on the inter-arrival times <span class="math inline">\(\boldsymbol{\tau}_i\)</span> and indicator variables <span class="math inline">\(\boldsymbol{R}_1\)</span> and <span class="math inline">\(\boldsymbol{R}_2\)</span>. These latter quantities are treated as missing data.</p>
-<p>The <em>pogit</em> R-package has functions to update these quantities; <a href="https://github.com/cran/pogit/blob/b0f4b72eaabb1ce32efa1f4ce5517be7ece2afd0/R/dataug_pois_iams.R#L69"><strong>iams1_poisson</strong></a> updates <span class="math inline">\(\boldsymbol{\tau}\)</span>, <a href="https://github.com/cran/pogit/blob/b0f4b72eaabb1ce32efa1f4ce5517be7ece2afd0/R/dataug_pois_iams.R#L97"><strong>iams2_poisson</strong></a> updates <span class="math inline">\(\boldsymbol{R}_1\)</span> and <span class="math inline">\(\boldsymbol{R}_2\)</span> (and returns them in a concatenated vector). The posterior mean and covariance are calculated as a function of those quantities in <a href="https://github.com/cran/pogit/blob/b0f4b72eaabb1ce32efa1f4ce5517be7ece2afd0/R/select_poisson.R#L110"><strong>select_poisson</strong></a>, where also a sampler from the posterior is drawn. The two additional functions <a href="https://github.com/cran/pogit/blob/master/R/mixcomp_poisson.R"><strong>mixcomp_poisson</strong></a> and <a href="https://github.com/cran/pogit/blob/b0f4b72eaabb1ce32efa1f4ce5517be7ece2afd0/R/compute_mixture.R"><strong>compute_mixture</strong></a> take care of the finite mixture approximation. <strong>mixcomp_poisson</strong> holds the necessary parameters for the finite mixture representation in the Poisson case, and <strong>compute_mixture</strong> uses those to calculate the approximation. The <strong>mixcomp_poisson</strong> function is (essentially) just a list, so I will ignore that for now and just call it from the package when I need it.</p>
+<p>The sampler relies on representing Poisson random variables in terms of their inter-arrival times, and approximating the distribution of the inter-arrival times by mixtures of normal distributions. Conditional on some quantities, the Poisson regression can be (approximately) represented as a linear regression. On each iteration of the sampler, the parameters are (conditionally) sampled from a multivariate normal distribution. Consequently, we can think of the sampler (algorithm) in three steps: 1) update parameters conditional on the inter-arrival times <span class="math inline">\(\boldsymbol{\tau}_i\)</span> and indicator variables <span class="math inline">\(\boldsymbol{r}_1\)</span> and <span class="math inline">\(\boldsymbol{r}_2\)</span>. These latter quantities are treated as missing data.</p>
+<p>The <em>pogit</em> R-package has functions to update these quantities; <a href="https://github.com/cran/pogit/blob/b0f4b72eaabb1ce32efa1f4ce5517be7ece2afd0/R/dataug_pois_iams.R#L69"><strong>iams1_poisson</strong></a> updates <span class="math inline">\(\boldsymbol{\tau}\)</span>, <a href="https://github.com/cran/pogit/blob/b0f4b72eaabb1ce32efa1f4ce5517be7ece2afd0/R/dataug_pois_iams.R#L97"><strong>iams2_poisson</strong></a> updates <span class="math inline">\(\boldsymbol{r}_1\)</span> and <span class="math inline">\(\boldsymbol{r}_2\)</span> (and returns them in a concatenated vector). The posterior mean and covariance are calculated as a function of those quantities in <a href="https://github.com/cran/pogit/blob/b0f4b72eaabb1ce32efa1f4ce5517be7ece2afd0/R/select_poisson.R#L110"><strong>select_poisson</strong></a>, where also a sampler from the posterior is drawn. The two additional functions <a href="https://github.com/cran/pogit/blob/master/R/mixcomp_poisson.R"><strong>mixcomp_poisson</strong></a> and <a href="https://github.com/cran/pogit/blob/b0f4b72eaabb1ce32efa1f4ce5517be7ece2afd0/R/compute_mixture.R"><strong>compute_mixture</strong></a> take care of the finite mixture approximation. <strong>mixcomp_poisson</strong> holds the necessary parameters for the finite mixture representation in the Poisson case, and <strong>compute_mixture</strong> uses those to calculate the approximation. The <strong>mixcomp_poisson</strong> function is (essentially) just a list, so I will ignore that for now and just call it from the package when I need it.</p>
 <p>All these functions are present in JAGS as well, in: <a href="https://github.com/todesking/JAGS-code/blob/master/src/modules/glm/samplers/AuxMixPoisson.cc">AuxMixPoisson.CC</a> and <a href="https://github.com/todesking/JAGS-code/blob/master/src/modules/glm/samplers/AuxMixPoisson.h">AuxMixPoisson.h</a>, and <a href="https://github.com/todesking/JAGS-code/blob/master/src/modules/glm/samplers/LGMix.cc">LGMix.CC</a>.</p>
 <section id="updating-the-inter-arrival-times-boldsymboltau" class="level3">
 <h3 class="anchored" data-anchor-id="updating-the-inter-arrival-times-boldsymboltau">Updating the inter-arrival times <span class="math inline">\(\boldsymbol{\tau}\)</span></h3>
@@ -187,7 +187,7 @@ Attaching package: 'nimble'</code></pre>
 </div>
 </section>
 <section id="updating-the-indicator-variables-boldsymbolr_1-and-boldsymbolr_2" class="level3">
-<h3 class="anchored" data-anchor-id="updating-the-indicator-variables-boldsymbolr_1-and-boldsymbolr_2">Updating the indicator variables <span class="math inline">\(\boldsymbol{R}_1\)</span> and <span class="math inline">\(\boldsymbol{R}_2\)</span></h3>
+<h3 class="anchored" data-anchor-id="updating-the-indicator-variables-boldsymbolr_1-and-boldsymbolr_2">Updating the indicator variables <span class="math inline">\(\boldsymbol{r}_1\)</span> and <span class="math inline">\(\boldsymbol{r}_2\)</span></h3>
 <p>So, tau is correct. Let us continue with a function for the indicator variables. The <strong>pogit</strong> package returns the two variables from the <strong>iams2_poisson</strong> function in a concatenated string, I have written two separate functions:</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>update_R1 <span class="ot">=</span> <span class="cf">function</span>(<span class="at">n.response.nodes =</span> <span class="fu">integer</span>(), <span class="at">lp =</span> <span class="fu">double</span>(<span class="dv">1</span>), <span class="at">t1 =</span> <span class="fu">double</span>(<span class="dv">1</span>), <span class="at">mcompm =</span> <span class="fu">double</span>(<span class="dv">2</span>), <span class="at">mcompv =</span> <span class="fu">double</span>(<span class="dv">2</span>), <span class="at">c1 =</span> <span class="fu">double</span>(<span class="dv">2</span>))</span>
@@ -321,7 +321,7 @@ Attaching package: 'nimble'</code></pre>
 <pre><code>[1] -73</code></pre>
 </div>
 </div>
-<p>the output for both sums should be zero, but for <span class="math inline">\(\boldsymbol{R}_2\)</span> is not. I suspect this is because the seed for <em>pogit_R</em> is not set correctøy, since the function includes two random number generators and mine only one. However, I have verified the calculation for <span class="math inline">\(\boldsymbol{R}_2\)</span> and it is correct.</p>
+<p>the output for both sums should be zero, but for <span class="math inline">\(\boldsymbol{r}_2\)</span> is not. I suspect this is because the seed for <em>pogit_R</em> is not set correctly, since the function includes two random number generators and mine includes only one. When using a number generator twice in sequence inside a function, <em>R</em> “acts” like the second sequence is a continuation of the first. In contrast, because I split the two up into two separate functions, <em>R</em> acts like they are both unique sequences. Anyway, I have verified that the calculation for <span class="math inline">\(\boldsymbol{r}_2\)</span> is correct.</p>
 </section>
 <section id="posterior-moments" class="level3">
 <h3 class="anchored" data-anchor-id="posterior-moments">Posterior moments</h3>
@@ -751,6 +751,39 @@ beta[2] 1.2354 0.01719 0.0004438      0.0009539
          2.5%    25%   50%    75%  97.5%
 beta[1] 0.486 0.5228 0.543 0.5644 0.6035
 beta[2] 1.201 1.2242 1.235 1.2473 1.2681</code></pre>
+</div>
+</div>
+<p>compare the solution to <em>pogit</em>:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb46"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a>pogit_run <span class="ot">&lt;-</span> pogit<span class="sc">::</span><span class="fu">poissonBvs</span>(y, <span class="at">X =</span> <span class="fu">cbind</span>(<span class="dv">1</span>,x), <span class="at">BVS =</span> <span class="cn">FALSE</span>, <span class="at">mcmc =</span> <span class="fu">list</span>(<span class="at">M =</span> <span class="dv">1000</span>, <span class="at">burnin =</span> <span class="dv">500</span>, <span class="at">thin =</span> <span class="dv">1</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+MCMC for the Poisson model:
+
+it = 1 /--- duration of MCMC so far: 0.26 sec.,  expected time to end: Inf  min. 
+it = 2 /--- duration of MCMC so far: 0.27 sec.,  expected time to end: 6.65  min. 
+it = 3 /--- duration of MCMC so far: 0.27 sec.,  expected time to end: 3.37  min. 
+it = 4 /--- duration of MCMC so far: 0.27 sec.,  expected time to end: 2.28  min. 
+it = 5 /--- duration of MCMC so far: 0.28 sec.,  expected time to end: 1.73  min. 
+it = 10 /--- duration of MCMC so far: 0.3 sec.,  expected time to end: 0.83  min. 
+it = 20 /--- duration of MCMC so far: 0.35 sec.,  expected time to end: 0.45  min. 
+it = 50 /--- duration of MCMC so far: 0.48 sec.,  expected time to end: 0.24  min. 
+it = 100 /--- duration of MCMC so far: 0.69 sec.,  expected time to end: 0.16  min. 
+it = 200 /--- duration of MCMC so far: 1.4 sec.,  expected time to end: 0.15  min. 
+it = 500 /--- duration of MCMC so far: 2.55 sec.,  expected time to end: 0.09  min. 
+it = 1000 /--- duration of MCMC so far: 4.46 sec.,  expected time to end: 0.04  min. 
+it = 1500 /--- duration of MCMC (total): 6.37 sec. 
+ </code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb48"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(pogit_run<span class="sc">$</span>samplesP<span class="sc">$</span>beta) <span class="co"># correct answer</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>     beta.0           beta.1      
+ Min.   :0.3825   Min.   :0.5695  
+ 1st Qu.:0.9781   1st Qu.:0.9950  
+ Median :0.9914   Median :1.0043  
+ Mean   :0.9891   Mean   :1.0044  
+ 3rd Qu.:1.0045   3rd Qu.:1.0138  
+ Max.   :1.0501   Max.   :1.0568  </code></pre>
 </div>
 </div>
 </section>

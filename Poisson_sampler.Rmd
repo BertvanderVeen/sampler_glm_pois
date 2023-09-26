@@ -17,9 +17,9 @@ JAGS has not one GLM sampler. It might seem like that at first glance because JA
 
 For the Poisson case this is based on the work by [Fruhwirth-Schnatter and Wagner 2004](https://research.wu.ac.at/en/publications/data-augmentation-and-gibbs-sampling-for-regression-models-of-sma-7) and [Fruhwirth-Schnatter et al. 2009](https://link.springer.com/article/10.1007/s11222-008-9109-4).
 
-The sampler relies on representing Poisson random variables in terms of their inter-arrival times, and approximating the distribution of the inter-arrival times by mixtures of normal distributions. Conditional on some quantities, the Poisson regression can be (approximately) represented as a linear regression. On each iteration of the sampler, the parameters are (conditionally) sampled from a multivariate normal distribution. Consequently, we can think of the sampler (algorithm) in three steps: 1) update parameters conditional on the inter-arrival times $\boldsymbol{\tau}_i$ and indicator variables $\boldsymbol{R}_1$ and $\boldsymbol{R}_2$. These latter quantities are treated as missing data.
+The sampler relies on representing Poisson random variables in terms of their inter-arrival times, and approximating the distribution of the inter-arrival times by mixtures of normal distributions. Conditional on some quantities, the Poisson regression can be (approximately) represented as a linear regression. On each iteration of the sampler, the parameters are (conditionally) sampled from a multivariate normal distribution. Consequently, we can think of the sampler (algorithm) in three steps: 1) update parameters conditional on the inter-arrival times $\boldsymbol{\tau}_i$ and indicator variables $\boldsymbol{r}_1$ and $\boldsymbol{r}_2$. These latter quantities are treated as missing data.
 
-The *pogit* R-package has functions to update these quantities; [**iams1_poisson**](https://github.com/cran/pogit/blob/b0f4b72eaabb1ce32efa1f4ce5517be7ece2afd0/R/dataug_pois_iams.R#L69) updates $\boldsymbol{\tau}$, [**iams2_poisson**](https://github.com/cran/pogit/blob/b0f4b72eaabb1ce32efa1f4ce5517be7ece2afd0/R/dataug_pois_iams.R#L97) updates $\boldsymbol{R}_1$ and $\boldsymbol{R}_2$ (and returns them in a concatenated vector). The posterior mean and covariance are calculated as a function of those quantities in [**select_poisson**](https://github.com/cran/pogit/blob/b0f4b72eaabb1ce32efa1f4ce5517be7ece2afd0/R/select_poisson.R#L110), where also a sampler from the posterior is drawn. The two additional functions [**mixcomp_poisson**](https://github.com/cran/pogit/blob/master/R/mixcomp_poisson.R) and [**compute_mixture**](https://github.com/cran/pogit/blob/b0f4b72eaabb1ce32efa1f4ce5517be7ece2afd0/R/compute_mixture.R) take care of the finite mixture approximation. **mixcomp_poisson** holds the necessary parameters for the finite mixture representation in the Poisson case, and **compute_mixture** uses those to calculate the approximation. The **mixcomp_poisson** function is (essentially) just a list, so I will ignore that for now and just call it from the package when I need it.
+The *pogit* R-package has functions to update these quantities; [**iams1_poisson**](https://github.com/cran/pogit/blob/b0f4b72eaabb1ce32efa1f4ce5517be7ece2afd0/R/dataug_pois_iams.R#L69) updates $\boldsymbol{\tau}$, [**iams2_poisson**](https://github.com/cran/pogit/blob/b0f4b72eaabb1ce32efa1f4ce5517be7ece2afd0/R/dataug_pois_iams.R#L97) updates $\boldsymbol{r}_1$ and $\boldsymbol{r}_2$ (and returns them in a concatenated vector). The posterior mean and covariance are calculated as a function of those quantities in [**select_poisson**](https://github.com/cran/pogit/blob/b0f4b72eaabb1ce32efa1f4ce5517be7ece2afd0/R/select_poisson.R#L110), where also a sampler from the posterior is drawn. The two additional functions [**mixcomp_poisson**](https://github.com/cran/pogit/blob/master/R/mixcomp_poisson.R) and [**compute_mixture**](https://github.com/cran/pogit/blob/b0f4b72eaabb1ce32efa1f4ce5517be7ece2afd0/R/compute_mixture.R) take care of the finite mixture approximation. **mixcomp_poisson** holds the necessary parameters for the finite mixture representation in the Poisson case, and **compute_mixture** uses those to calculate the approximation. The **mixcomp_poisson** function is (essentially) just a list, so I will ignore that for now and just call it from the package when I need it.
 
 All these functions are present in JAGS as well, in: [AuxMixPoisson.CC](https://github.com/todesking/JAGS-code/blob/master/src/modules/glm/samplers/AuxMixPoisson.cc) and [AuxMixPoisson.h](https://github.com/todesking/JAGS-code/blob/master/src/modules/glm/samplers/AuxMixPoisson.h), and [LGMix.CC](https://github.com/todesking/JAGS-code/blob/master/src/modules/glm/samplers/LGMix.cc).
 
@@ -67,7 +67,7 @@ sum(my_tau[,1] - pogit_tau$t1) # should be zero
 sum(my_tau[y>0,2] - pogit_tau$t2) # should be zero
 ```
 
-### Updating the indicator variables $\boldsymbol{R}_1$ and $\boldsymbol{R}_2$
+### Updating the indicator variables $\boldsymbol{r}_1$ and $\boldsymbol{r}_2$
 
 So, tau is correct. Let us continue with a function for the indicator variables. The **pogit** package returns the two variables from the **iams2_poisson** function in a concatenated string, I have written two separate functions:
 
@@ -200,7 +200,7 @@ sum(pogit_R[1:N]-my_R1) # should be zero
 sum(pogit_R[-c(1:N)]-my_R2) # should be zero 
 ```
 
-the output for both sums should be zero, but for $\boldsymbol{R}_2$ is not. I suspect this is because the seed for *pogit_R* is not set correctøy, since the function includes two random number generators and mine only one. However, I have verified the calculation for $\boldsymbol{R}_2$ and it is correct.
+the output for both sums should be zero, but for $\boldsymbol{r}_2$ is not. I suspect this is because the seed for *pogit_R* is not set correctly, since the function includes two random number generators and mine includes only one. When using a number generator twice in sequence inside a function, *R* "acts" like the second sequence is a continuation of the first. In contrast, because I split the two up into two separate functions, *R* acts like they are both unique sequences. Anyway, I have verified that the calculation for $\boldsymbol{r}_2$ is correct.
 
 ### Posterior moments
 
@@ -558,7 +558,7 @@ mod <- nimble::compileNimble(model)
 
 and add and run it for a few iterations to see that we get something sensible:
 
-```{r run_mcmc}
+```{r run_my_mcmc}
 nimbleMCMCconf <- configureMCMC(mod, monitors = c("beta"), print = FALSE)
 nimbleMCMCconf$removeSampler("beta")
 nimbleMCMCconf$addSampler("beta",type="sampler_glm_pois", print = T)
@@ -566,4 +566,10 @@ nimbleMCMCb <- buildMCMC(nimbleMCMCconf)
 nimbleMCMCc <- compileNimble(nimbleMCMCb, project = mod)
 test_run <- runMCMC(nimbleMCMCc, niter = 1000, nburnin = 500, thin = 1, nchains = 3, samplesAsCodaMCMC = TRUE)
 summary(test_run)# wrong answer :(
+```
+
+compare the solution to *pogit*:
+```{r run_pogit_mcmc}
+pogit_run <- pogit::poissonBvs(y, X = cbind(1,x), BVS = FALSE, mcmc = list(M = 1000, burnin = 500, thin = 1))
+summary(pogit_run$samplesP$beta) # correct answer
 ```
